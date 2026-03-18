@@ -29,6 +29,10 @@ export function useNodeKeyboard({ nodeId, divRef, isProjectTitle = false }: UseN
           }
         } else {
           const newId = store.createNode(node.parentId, nodeId);
+          // New sibling inherits the status type (but not the value)
+          if (node.statusType !== 'none') {
+            store.setStatusType(newId, node.statusType);
+          }
           store.setActiveNode(newId, false);
         }
         return;

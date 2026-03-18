@@ -46,7 +46,13 @@ export function StatusIndicator({ nodeId }: StatusIndicatorProps) {
       e.preventDefault();
       e.stopPropagation();
       if (!node) return;
-      // Right-click cycles through status types: none → checkable → project → none
+      // Block type change if the node has a meaningful status value set:
+      // checkable + checked, or project with status beyond 'todo'
+      const isLocked =
+        (node.statusType === 'checkable' && node.checked) ||
+        (node.statusType === 'project' && node.projectStatus !== 'todo');
+      if (isLocked) return;
+      // Cycle status types: none → checkable → project → none
       const next: StatusType =
         node.statusType === 'none'
           ? 'checkable'
@@ -71,7 +77,9 @@ export function StatusIndicator({ nodeId }: StatusIndicatorProps) {
           : node.statusType === 'checkable'
           ? node.checked
             ? 'Checked — click to uncheck'
-            : 'Click to check'
+            : 'Click to check · Right-click to change type'
+          : node.projectStatus === 'todo'
+          ? `Status: Todo — click to cycle · Right-click to change type`
           : `Status: ${STATUS_LABELS[node.projectStatus ?? 'todo']} — click to cycle`
       }
       role="button"
