@@ -43,12 +43,25 @@ interface NodeData {
   updatedAt: number;
   isDaily: boolean;
   dailyDate: string | null;     // ISO date, e.g. "2026-03-17"
+  linkedNodeId: string | null;  // If set, this node is a symbolic link to the target node
 }
 ```
 
 **Content format**: Plain text with inline mention markers like `@{abc123}`. When rendering, these are parsed and replaced with styled `<span contenteditable="false">` elements showing the linked node's current text.
 
 **Flat map storage** (`Record<NodeId, NodeData>` + `rootIds: string[]`) — O(1) lookups, cheap reparenting, DnD-compatible.
+
+### Node Linking vs. @ Mentions
+
+| Feature | `@` Mention | Node Link |
+|---------|-------------|-----------|
+| What it is | Inline text reference inside a node's content | A node that IS a full alias of another node |
+| Appears as | A styled span inside text | A full tree node at a new position |
+| Editing | Read-only span; click navigates | Edits propagate to the target node |
+| Children | N/A | Displays target's children; structural changes (add/remove children) affect the target |
+| Local state | None | Link node has its own `collapsed` state independent of the target |
+| Deletion | Removes the inline span | Removes the link node only; target is unaffected |
+| Visual cue | 🔗 icon + live name | Chain icon prefix on the node bullet |
 
 ## Key Architecture Decisions
 
@@ -58,6 +71,7 @@ interface NodeData {
 | State mgmt | Zustand + Immer | Fine-grained selectors per node, no context re-render storms |
 | Text editing | Plain `contenteditable` divs | Zero overhead, instant Enter/Tab, no editor framework mount/unmount. Workflowy uses the same approach |
 | `@` mentions | Custom contenteditable + fuse.js popup | Lightweight: detect `@` keystroke, show popup, insert atomic `<span>` |
+| Node linking | `[[` keystroke + popup → creates a link node | Symbolic-link semantics: full node alias at any tree position |
 | DnD | @dnd-kit/core + sortable | Reparenting via projection, official tree example, lightweight |
 | Persistence | Dexie.js (IndexedDB) | No 5MB limit, async, structured queries, browser-native |
 | Export | dexie-export-import | Native Dexie blob export/import, no WASM needed |
@@ -84,6 +98,7 @@ src/
 │   ├── exportImport.ts           # dexie-export-import wrapper
 │   ├── contentParser.ts          # Parse/render content with @{id} mention markers
 │   ├── fuzzySearch.ts            # fuse.js wrapper
+│   ├── linkResolver.ts           # Resolve linkedNodeId chains with cycle detection
 │   └── id.ts                     # nanoid wrapper
 ├── hooks/
 │   ├── useNodeKeyboard.ts        # Per-node keydown handler (Enter, Tab, Backspace, etc.)
@@ -94,6 +109,7 @@ src/
 │   ├── NodeTree/                 # Tree renderer + DnD context + NodeItem
 │   ├── NodeContent/              # contenteditable div + mention rendering
 │   ├── MentionPopup/             # Floating @ search popup
+│   ├── LinkPopup/                # Floating [[ link-creation popup
 │   ├── StatusIndicator/          # Checkbox / project badge
 │   ├── Workbench/                # WorkbenchView, WorkbenchPane, HorizontalScroller
 │   ├── Settings/                 # SettingsPanel (column counts, preferences)
@@ -171,6 +187,7 @@ Handled via `onKeyDown` on each `<div contenteditable>`:
 - **Arrow Down** (cursor at end) — focus next visible node (cursor at start)
 - **Cmd/Ctrl+Enter** — toggle checkbox / cycle project status
 - **`@`** — open MentionPopup at cursor position
+- **`[[`** — open LinkPopup; on selection, create a new linked node as the next sibling
 
 ### Focus management
 
@@ -189,6 +206,50 @@ Store tracks `activeNodeId`. When it changes, the corresponding `NodeContent` co
 ### Mention span rendering
 
 The `NodeContent` component subscribes to referenced node data. When a linked node's text or status changes, the mention span updates automatically. Checked items show strikethrough, project items show their status color.
+
+## Node Linking (Symbolic Links)
+
+A **linked node** is a node whose `linkedNodeId` points to a target node. It behaves like a symbolic link:
+
+- **Content** — always displays the target node's `content`. Editing it updates the target.
+- **Status** — always reflects the target's `statusType`, `projectStatus`, `checked`. Toggling it updates the target.
+- **Children** — renders the target's `childrenIds` subtree. Adding/removing/reordering children on a link node modifies the target's `childrenIds`.
+- **Collapse** — the link node has its own `collapsed` field, independent of the target's collapsed state.
+- **Deletion** — deleting a link node removes only the link; the target and its subtree are untouched.
+- **Circular links** — when resolving a link chain, stop at depth 10 and treat as broken link.
+
+### Creating a link node
+
+1. User types `[[` anywhere in a contenteditable node
+2. A **LinkPopup** (identical UX to MentionPopup) opens — fuse.js search over all nodes
+3. On selection: a **new sibling node** is created below the current node with `linkedNodeId = selectedId`, and `content` / `childrenIds` are intentionally empty (resolved at render time from the target)
+4. The `[[query` text typed so far is cleared before creating the link node
+
+Alternative creation: right-click a node → "Create link here" → LinkPopup opens.
+
+### Rendering link nodes
+
+`NodeItem` checks `node.linkedNodeId`. If set, it resolves the target via a Zustand selector and renders as if the target were the node:
+
+```
+[⛓] [target content text]    ← link icon prefix, text from target
+  ├─ [target child 1]
+  └─ [target child 2]
+```
+
+- Broken links (target deleted) show `[⛓ broken link]` in muted red, with an option to unlink or delete.
+- The `NodeContent` component receives `effectiveNode = target ?? node`, so all editing/status actions dispatch on the target's ID.
+
+### Store actions
+
+- `createLinkNode(targetId, parentId, afterSiblingId)` — creates a new `NodeData` with `linkedNodeId = targetId`
+- `unlinkNode(linkNodeId)` — sets `linkedNodeId = null`, copies target's current content/status into the link node (makes it independent)
+- Existing `updateNodeContent`, `toggleChecked`, `cycleProjectStatus`, `moveNode` are unaware of links — the component resolves the effective ID before dispatching
+
+### File additions
+
+- `src/components/LinkPopup/` — reuses MentionPopup layout, triggers on `[[`
+- `src/lib/linkResolver.ts` — `resolveLink(nodeId, store): NodeData` with cycle detection
 
 ## Drag and Drop
 
@@ -245,13 +306,25 @@ class NotebenchDB extends Dexie {
 - SettingsPanel with column count sliders (persisted in Dexie meta table)
 - CSS scroll-snap for card navigation
 
-### Phase 4: @ Mentions and Linking
+### Phase 4: @ Mentions and Node Linking
+
+**4a — @ Mentions**
 - `@` keystroke detection in contenteditable
 - MentionPopup (floating portal, fuse.js fuzzy search, keyboard navigation)
 - Atomic mention `<span>` insertion into contenteditable
 - `contentParser.ts` for serialize/render of mention markers
 - Live status reflection on mention spans
 - Click-to-navigate on mentions
+
+**4b — Node Linking (symbolic links)**
+- `linkedNodeId` field added to `NodeData` and Dexie schema (version bump)
+- `[[` keystroke detection → LinkPopup (reuses MentionPopup layout)
+- `createLinkNode` store action; `unlinkNode` store action
+- `linkResolver.ts` — chain resolution with depth-10 cycle guard
+- `NodeItem` resolves effective node via `linkedNodeId` before rendering; dispatches all edits on the target's ID
+- Chain icon (⛓) prefix on link node bullets
+- Broken-link state (target deleted): muted red display + unlink/delete options
+- Link node `collapsed` state is local (independent of target's collapsed)
 
 ### Phase 5: Drag and Drop
 - @dnd-kit setup, flatten for DnD, `getProjection()`
@@ -284,6 +357,7 @@ After each phase:
    - Phase 1: Create nodes, indent/outdent, refresh → data persists. Enter/Tab feel instant.
    - Phase 2: Toggle checkboxes, cycle project status, verify visual indicators
    - Phase 3: Collapse nodes, switch to workbench view, adjust settings, scroll horizontally
-   - Phase 4: Type `@`, search, select → mention span appears inline, click navigates, status reflects
+   - Phase 4a: Type `@`, search, select → mention span appears inline, click navigates, status reflects
+   - Phase 4b: Type `[[`, search, select → linked node created as sibling; editing link node content/status updates original; deleting the link leaves original intact; broken link shows correct error state
    - Phase 5: Drag to reorder + reparent, verify tree structure after drop
    - Phase 7: Export → import on fresh browser → verify all nodes restored
