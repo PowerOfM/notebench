@@ -1,4 +1,5 @@
 import type { NodeData, NodeMap } from '../types/node';
+import { resolveLink } from './linkResolver';
 
 export interface FlatNode {
   id: string;
@@ -18,8 +19,12 @@ export function flattenVisible(
     const node = nodes[id];
     if (!node) continue;
     result.push({ id, depth });
-    if (!node.collapsed && node.childrenIds.length > 0) {
-      result.push(...flattenVisible(node.childrenIds, nodes, depth + 1));
+    // Link nodes use their own collapsed state but show the target's children
+    const effectiveChildren = node.linkedNodeId
+      ? (resolveLink(node.linkedNodeId, nodes)?.childrenIds ?? [])
+      : node.childrenIds;
+    if (!node.collapsed && effectiveChildren.length > 0) {
+      result.push(...flattenVisible(effectiveChildren, nodes, depth + 1));
     }
   }
   return result;

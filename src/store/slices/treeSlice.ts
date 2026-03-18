@@ -18,4 +18,8 @@ export interface TreeActions {
   toggleChecked: (id: string) => void;
   cycleProjectStatus: (id: string) => void;
   setStatusType: (id: string, statusType: import('../../types/node').StatusType) => void;
+  /** Create a new link node (linkedNodeId = targetId) inserted after afterSiblingId. Returns new node id. */
+  createLinkNode: (targetId: string, afterSiblingId: string) => string;
+  /** Detach the link: copy target content/status into link node, set linkedNodeId = null. */
+  unlinkNode: (linkNodeId: string) => void;
 }

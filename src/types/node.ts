@@ -21,6 +21,7 @@ export interface NodeData {
   updatedAt: number;
   isDaily: boolean;
   dailyDate: string | null;
+  linkedNodeId: string | null;  // symbolic link target; null = normal node
 }
 
 export type NodeMap = Record<string, NodeData>;

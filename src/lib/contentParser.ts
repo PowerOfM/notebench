@@ -84,6 +84,28 @@ export function createMentionSpan(
 }
 
 /**
+ * Returns the query string after the last `[[` in the current text node
+ * before the cursor, or null if no active link trigger is found.
+ */
+export function getLinkQueryAtCursor(div: HTMLDivElement): string | null {
+  const sel = window.getSelection();
+  if (!sel || !sel.isCollapsed) return null;
+  const { anchorNode, anchorOffset } = sel;
+  if (!anchorNode || anchorNode.nodeType !== Node.TEXT_NODE) return null;
+  if (!div.contains(anchorNode)) return null;
+
+  const textBefore = (anchorNode.textContent ?? '').slice(0, anchorOffset);
+  const bracketIdx = textBefore.lastIndexOf('[[');
+  if (bracketIdx === -1) return null;
+
+  const afterBrackets = textBefore.slice(bracketIdx + 2);
+  // Spaces or newlines close the link query
+  if (/[\s]/.test(afterBrackets)) return null;
+
+  return afterBrackets;
+}
+
+/**
  * Returns the query string after the last `@` in the current text node
  * before the cursor, or null if no active mention trigger is found.
  */

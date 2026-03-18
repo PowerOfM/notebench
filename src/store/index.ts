@@ -42,6 +42,7 @@ export const useStore = create<StoreState>()(
           updatedAt: now,
           isDaily: false,
           dailyDate: null,
+          linkedNodeId: null,
         };
         const siblings =
           parentId === null
@@ -195,6 +196,55 @@ export const useStore = create<StoreState>()(
           node.checked = false;
           node.projectStatus = node.projectStatus ?? 'todo';
         }
+        node.updatedAt = Date.now();
+      });
+    },
+
+    createLinkNode(targetId: string, afterSiblingId: string): string {
+      const id = generateId();
+      const now = Date.now();
+      set((state) => {
+        const afterNode = state.nodes[afterSiblingId];
+        if (!afterNode) return;
+        state.nodes[id] = {
+          id,
+          parentId: afterNode.parentId,
+          content: '',
+          mentions: [],
+          statusType: 'none',
+          projectStatus: null,
+          checked: false,
+          collapsed: false,
+          childrenIds: [],
+          createdAt: now,
+          updatedAt: now,
+          isDaily: false,
+          dailyDate: null,
+          linkedNodeId: targetId,
+        };
+        const siblings =
+          afterNode.parentId === null
+            ? state.rootIds
+            : (state.nodes[afterNode.parentId]?.childrenIds ?? state.rootIds);
+        const idx = siblings.indexOf(afterSiblingId);
+        siblings.splice(idx + 1, 0, id);
+      });
+      return id;
+    },
+
+    unlinkNode(linkNodeId: string) {
+      set((state) => {
+        const node = state.nodes[linkNodeId];
+        if (!node?.linkedNodeId) return;
+        const target = state.nodes[node.linkedNodeId];
+        if (target) {
+          node.content = target.content;
+          node.mentions = [...target.mentions];
+          node.statusType = target.statusType;
+          node.projectStatus = target.projectStatus;
+          node.checked = target.checked;
+        }
+        node.linkedNodeId = null;
         node.updatedAt = Date.now();
       });
     },
