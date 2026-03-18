@@ -38,7 +38,9 @@ export function NodeContent({
   const { handleKeyDown: handleNodeKeyDown } = useNodeKeyboard({ nodeId, divRef, isProjectTitle });
 
   const isActive = activeNodeId === nodeId;
-  const prevNodeIdRef = useRef(nodeId);
+  // Null sentinel ensures the first render always syncs the DOM,
+  // even if the node mounts with isActive=true (e.g. via mention navigation).
+  const prevNodeIdRef = useRef<string | null>(null);
 
   // Mention popup state
   const [mentionState, setMentionState] = useState<{
