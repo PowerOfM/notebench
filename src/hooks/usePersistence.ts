@@ -15,7 +15,13 @@ export function usePersistence() {
   const setActiveProject = useStore((s) => s.setActiveProject);
   const setProjectColumns = useStore((s) => s.setProjectColumns);
   const setDailyColumns = useStore((s) => s.setDailyColumns);
+
+  // Accumulated dirty state — persists across subscription calls so the
+  // debounced timer always sees the full picture regardless of which
+  // subscription invocation last reset the timer.
   const dirtyRef = useRef<Set<string>>(new Set());
+  const deletedIdsRef = useRef<Set<string>>(new Set());
+  const rootIdsDirtyRef = useRef(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevNodesRef = useRef<NodeMap>({});
   const prevRootIdsRef = useRef<string[]>([]);
@@ -68,45 +74,63 @@ export function usePersistence() {
     const unsub = useStore.subscribe((state) => {
       const { nodes, rootIds } = state;
 
-      // Find changed nodes
+      // Accumulate changed nodes into the dirty ref
       for (const id in nodes) {
         if (nodes[id] !== prevNodesRef.current[id]) {
           dirtyRef.current.add(id);
         }
       }
 
-      // Find deleted nodes
-      const deletedIds: string[] = [];
+      // Accumulate deleted nodes into the deleted ref
       for (const id in prevNodesRef.current) {
         if (!nodes[id]) {
-          deletedIds.push(id);
+          deletedIdsRef.current.add(id);
+          // A deleted node is definitely no longer dirty
+          dirtyRef.current.delete(id);
         }
       }
 
-      const rootIdsChanged =
-        JSON.stringify(rootIds) !== JSON.stringify(prevRootIdsRef.current);
+      // Accumulate rootIds changes
+      if (JSON.stringify(rootIds) !== JSON.stringify(prevRootIdsRef.current)) {
+        rootIdsDirtyRef.current = true;
+      }
 
       prevNodesRef.current = nodes;
       prevRootIdsRef.current = rootIds;
 
-      if (dirtyRef.current.size === 0 && deletedIds.length === 0 && !rootIdsChanged) return;
+      if (
+        dirtyRef.current.size === 0 &&
+        deletedIdsRef.current.size === 0 &&
+        !rootIdsDirtyRef.current
+      ) {
+        return;
+      }
 
       // Debounce the actual DB write
       if (timerRef.current) clearTimeout(timerRef.current);
       timerRef.current = setTimeout(async () => {
+        // Drain all accumulated dirty state
         const dirty = [...dirtyRef.current];
         dirtyRef.current.clear();
+        const deletedIds = [...deletedIdsRef.current];
+        deletedIdsRef.current.clear();
+        const shouldSaveRootIds = rootIdsDirtyRef.current;
+        rootIdsDirtyRef.current = false;
+
+        // Use the live store state for nodes/rootIds so we always write
+        // the latest values rather than stale closure data.
+        const liveState = useStore.getState();
 
         const toSave: NodeData[] = [];
         for (const id of dirty) {
-          if (nodes[id]) toSave.push(nodes[id]);
+          if (liveState.nodes[id]) toSave.push(liveState.nodes[id]);
         }
 
         await Promise.all([
           toSave.length > 0 ? db.nodes.bulkPut(toSave) : Promise.resolve(),
           deletedIds.length > 0 ? db.nodes.bulkDelete(deletedIds) : Promise.resolve(),
-          rootIdsChanged
-            ? db.meta.put({ key: 'rootIds', value: state.rootIds })
+          shouldSaveRootIds
+            ? db.meta.put({ key: 'rootIds', value: liveState.rootIds })
             : Promise.resolve(),
         ]);
       }, 300);
