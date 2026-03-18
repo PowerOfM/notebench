@@ -43,6 +43,9 @@ export function useNodeKeyboard({ nodeId, divRef, isProjectTitle = false }: UseN
 
       if (e.key === 'Tab' && e.shiftKey) {
         e.preventDefault();
+        // Don't outdent if already a direct child of a root project node
+        const parent = node.parentId ? nodes[node.parentId] : null;
+        if (!parent || parent.parentId === null) return;
         store.outdentNode(nodeId);
         store.setActiveNode(nodeId, true);
         return;
