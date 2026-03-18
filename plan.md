@@ -271,6 +271,7 @@ class NotebenchDB extends Dexie {
 ### Phase 8: Polish
 - Empty states (no projects yet, no daily notes)
 - Responsive layout for narrow screens
+- Floating toolbar for mobile/touch devices for indentation and other keyboard shortcuts
 - Accessibility: ARIA labels, keyboard-only audit
 - Performance profiling with 500+ nodes
 
