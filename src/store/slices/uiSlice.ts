@@ -4,6 +4,9 @@ export interface UIState {
   sidebarCollapsed: boolean;
   activeView: 'project' | 'workbench';
   activeProjectId: string | null;
+  projectColumns: number;
+  dailyColumns: number;
+  settingsPanelOpen: boolean;
 }
 
 export interface UIActions {
@@ -11,32 +14,7 @@ export interface UIActions {
   setSidebarCollapsed: (collapsed: boolean) => void;
   setActiveView: (view: 'project' | 'workbench') => void;
   setActiveProject: (id: string | null) => void;
-}
-
-export function createUISlice(): UIState & UIActions {
-  return {
-    activeNodeId: null,
-    focusCursorAtEnd: false,
-    sidebarCollapsed: false,
-    activeView: 'project',
-    activeProjectId: null,
-
-    setActiveNode(id, cursorAtEnd = false) {
-      this.activeNodeId = id;
-      this.focusCursorAtEnd = cursorAtEnd;
-    },
-
-    setSidebarCollapsed(collapsed) {
-      this.sidebarCollapsed = collapsed;
-    },
-
-    setActiveView(view) {
-      this.activeView = view;
-    },
-
-    setActiveProject(id) {
-      this.activeProjectId = id;
-      this.activeView = 'project';
-    },
-  };
+  setProjectColumns: (n: number) => void;
+  setDailyColumns: (n: number) => void;
+  setSettingsPanelOpen: (open: boolean) => void;
 }

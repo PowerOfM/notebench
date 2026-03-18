@@ -3,6 +3,9 @@ import { useStore } from '../store';
 import { db } from '../lib/db';
 import type { NodeData, NodeMap } from '../types/node';
 
+const SETTINGS_KEYS = ['projectColumns', 'dailyColumns'] as const;
+type SettingsKey = typeof SETTINGS_KEYS[number];
+
 /**
  * Loads data from IndexedDB on mount, then subscribes to store changes
  * and debounces saves back to IndexedDB.
@@ -10,6 +13,8 @@ import type { NodeData, NodeMap } from '../types/node';
 export function usePersistence() {
   const loadNodes = useStore((s) => s.loadNodes);
   const setActiveProject = useStore((s) => s.setActiveProject);
+  const setProjectColumns = useStore((s) => s.setProjectColumns);
+  const setDailyColumns = useStore((s) => s.setDailyColumns);
   const dirtyRef = useRef<Set<string>>(new Set());
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevNodesRef = useRef<NodeMap>({});
@@ -18,12 +23,23 @@ export function usePersistence() {
   // Load from DB on mount
   useEffect(() => {
     async function load() {
-      const [allNodes, rootIdsMeta] = await Promise.all([
+      const [allNodes, rootIdsMeta, ...settingsMetas] = await Promise.all([
         db.nodes.toArray(),
         db.meta.get('rootIds'),
+        ...SETTINGS_KEYS.map((k) => db.meta.get(k)),
       ]);
       const rootIds: string[] = rootIdsMeta ? (rootIdsMeta.value as string[]) : [];
       loadNodes(allNodes, rootIds);
+
+      // Restore settings
+      const setters: Record<SettingsKey, (n: number) => void> = {
+        projectColumns: setProjectColumns,
+        dailyColumns: setDailyColumns,
+      };
+      SETTINGS_KEYS.forEach((key, i) => {
+        const meta = settingsMetas[i];
+        if (meta?.value != null) setters[key](meta.value as number);
+      });
 
       // Auto-activate first root node as project if any
       if (rootIds.length > 0) {
@@ -31,7 +47,21 @@ export function usePersistence() {
       }
     }
     load();
-  }, [loadNodes, setActiveProject]);
+  }, [loadNodes, setActiveProject, setProjectColumns, setDailyColumns]);
+
+  // Save settings to meta when they change
+  useEffect(() => {
+    const unsub = useStore.subscribe((state, prev) => {
+      const saves: Promise<unknown>[] = [];
+      for (const key of SETTINGS_KEYS) {
+        if (state[key] !== prev[key]) {
+          saves.push(db.meta.put({ key, value: state[key] }));
+        }
+      }
+      if (saves.length > 0) Promise.all(saves);
+    });
+    return () => unsub();
+  }, []);
 
   // Subscribe to changes and debounce writes
   useEffect(() => {

@@ -204,6 +204,9 @@ export const useStore = create<StoreState>()(
     sidebarCollapsed: false,
     activeView: 'project',
     activeProjectId: null,
+    projectColumns: 2,
+    dailyColumns: 2,
+    settingsPanelOpen: false,
 
     setActiveNode(id: string | null, cursorAtEnd = false) {
       set((state) => {
@@ -228,6 +231,24 @@ export const useStore = create<StoreState>()(
       set((state) => {
         state.activeProjectId = id;
         state.activeView = 'project';
+      });
+    },
+
+    setProjectColumns(n: number) {
+      set((state) => {
+        state.projectColumns = Math.max(1, Math.min(4, n));
+      });
+    },
+
+    setDailyColumns(n: number) {
+      set((state) => {
+        state.dailyColumns = Math.max(1, Math.min(4, n));
+      });
+    },
+
+    setSettingsPanelOpen(open: boolean) {
+      set((state) => {
+        state.settingsPanelOpen = open;
       });
     },
   }))

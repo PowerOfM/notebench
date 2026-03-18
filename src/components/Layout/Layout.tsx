@@ -3,10 +3,13 @@ import { useStore } from '../../store';
 import { Sidebar } from './Sidebar';
 import { NodeTree } from '../NodeTree/NodeTree';
 import { NodeContent } from '../NodeContent/NodeContent';
+import { WorkbenchView } from '../Workbench/WorkbenchView';
+import { SettingsPanel } from '../Settings/SettingsPanel';
 import styles from './Layout.module.css';
 
 export function Layout() {
   const activeProjectId = useStore((s) => s.activeProjectId);
+  const activeView = useStore((s) => s.activeView);
   const nodes = useStore((s) => s.nodes);
   const createNode = useStore((s) => s.createNode);
   const setActiveNode = useStore((s) => s.setActiveNode);
@@ -16,7 +19,7 @@ export function Layout() {
 
   const handleAddProject = useCallback(() => {
     const id = createNode(null);
-    createNode(id); // auto-create first child node
+    createNode(id);
     setActiveProject(id);
     setActiveNode(id, false);
   }, [createNode, setActiveProject, setActiveNode]);
@@ -31,7 +34,9 @@ export function Layout() {
     <div className={styles.layout}>
       <Sidebar />
       <main className={styles.main}>
-        {!activeProject ? (
+        {activeView === 'workbench' ? (
+          <WorkbenchView />
+        ) : !activeProject ? (
           <div className={styles.emptyState}>
             <h2>No project selected</h2>
             <p>Create a project to get started</p>
@@ -65,6 +70,7 @@ export function Layout() {
           </div>
         )}
       </main>
+      <SettingsPanel />
     </div>
   );
 }
