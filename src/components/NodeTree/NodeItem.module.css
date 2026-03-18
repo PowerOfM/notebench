@@ -1,0 +1,58 @@
+.row {
+  display: flex;
+  align-items: flex-start;
+  padding-left: calc(var(--indent-size) * var(--depth, 0));
+  min-height: 28px;
+  border-radius: var(--radius-sm);
+}
+
+.row:hover {
+  background: var(--color-bg-hover);
+}
+
+.row:hover .collapseBtn {
+  opacity: 1;
+}
+
+.gutter {
+  display: flex;
+  align-items: flex-start;
+  padding-top: calc(var(--node-padding-y) + 3px);
+  width: 20px;
+  flex-shrink: 0;
+}
+
+.bullet {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-text-faint);
+  margin: auto;
+  flex-shrink: 0;
+}
+
+.collapseBtn {
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-muted);
+  opacity: 0;
+  transition: opacity var(--transition-fast), transform var(--transition-fast);
+  flex-shrink: 0;
+  font-size: 10px;
+  line-height: 1;
+}
+
+.collapseBtn.expanded {
+  transform: rotate(90deg);
+}
+
+.collapseBtn.visible {
+  opacity: 0.5;
+}
+
+.children {
+  /* children rendered below at same level with indent applied via CSS var */
+}
