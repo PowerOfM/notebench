@@ -22,13 +22,21 @@ export function NodeContent({ nodeId, isProjectTitle, placeholder = 'Type someth
   // Sync content to DOM only when not focused (avoid fighting with user input)
   const isActive = activeNodeId === nodeId;
 
+  // Track nodeId so we can force-sync when the component is reused for a
+  // different node (e.g. switching active project reuses the title NodeContent).
+  const prevNodeIdRef = useRef(nodeId);
+
   useEffect(() => {
     const div = divRef.current;
-    if (!div || isActive) return;
+    if (!div) return;
+    const nodeChanged = prevNodeIdRef.current !== nodeId;
+    prevNodeIdRef.current = nodeId;
+    // Always sync on node switch; otherwise skip while the user is editing.
+    if (!nodeChanged && isActive) return;
     if (div.textContent !== content) {
       div.textContent = content;
     }
-  }, [content, isActive]);
+  }, [nodeId, content, isActive]);
 
   // Focus management: when this node becomes active, focus the div
   useEffect(() => {
