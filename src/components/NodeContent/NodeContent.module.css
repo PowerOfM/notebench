@@ -1,0 +1,15 @@
+.editor {
+  flex: 1;
+  padding: var(--node-padding-y) 4px;
+  font-size: var(--font-size-base);
+  color: var(--color-text);
+  cursor: text;
+  line-height: var(--line-height);
+  min-width: 0;
+}
+
+.editor:empty::before {
+  content: attr(data-placeholder);
+  color: var(--color-text-faint);
+  pointer-events: none;
+}
