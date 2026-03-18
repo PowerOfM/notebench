@@ -16,6 +16,7 @@ export function Layout() {
 
   const handleAddProject = useCallback(() => {
     const id = createNode(null);
+    createNode(id); // auto-create first child node
     setActiveProject(id);
     setActiveNode(id, false);
   }, [createNode, setActiveProject, setActiveNode]);
@@ -41,7 +42,7 @@ export function Layout() {
         ) : (
           <div className={styles.projectView}>
             <div className={styles.projectHeader}>
-              <NodeContent nodeId={activeProjectId!} />
+              <NodeContent nodeId={activeProjectId!} isProjectTitle placeholder="Project name..." />
             </div>
             <div className={styles.content}>
               {activeProject.childrenIds.length === 0 ? (

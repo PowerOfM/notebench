@@ -5,16 +5,18 @@ import styles from './NodeContent.module.css';
 
 interface NodeContentProps {
   nodeId: string;
+  isProjectTitle?: boolean;
+  placeholder?: string;
 }
 
-export function NodeContent({ nodeId }: NodeContentProps) {
+export function NodeContent({ nodeId, isProjectTitle, placeholder = 'Type something...' }: NodeContentProps) {
   const divRef = useRef<HTMLDivElement>(null);
   const content = useStore((s) => s.nodes[nodeId]?.content ?? '');
   const activeNodeId = useStore((s) => s.activeNodeId);
   const focusCursorAtEnd = useStore((s) => s.focusCursorAtEnd);
   const updateContent = useStore((s) => s.updateContent);
   const setActiveNode = useStore((s) => s.setActiveNode);
-  const { handleKeyDown } = useNodeKeyboard({ nodeId, divRef });
+  const { handleKeyDown } = useNodeKeyboard({ nodeId, divRef, isProjectTitle });
 
   // Sync content to DOM only when not focused (avoid fighting with user input)
   const isActive = activeNodeId === nodeId;
@@ -69,7 +71,7 @@ export function NodeContent({ nodeId }: NodeContentProps) {
       contentEditable
       suppressContentEditableWarning
       data-node-id={nodeId}
-      data-placeholder="Type something..."
+      data-placeholder={placeholder}
       onInput={handleInput}
       onKeyDown={handleKeyDown}
       onFocus={handleFocus}

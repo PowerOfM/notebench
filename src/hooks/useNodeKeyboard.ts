@@ -5,9 +5,10 @@ import { flattenVisible } from '../lib/tree';
 interface UseNodeKeyboardOptions {
   nodeId: string;
   divRef: React.RefObject<HTMLDivElement | null>;
+  isProjectTitle?: boolean;
 }
 
-export function useNodeKeyboard({ nodeId, divRef }: UseNodeKeyboardOptions) {
+export function useNodeKeyboard({ nodeId, divRef, isProjectTitle = false }: UseNodeKeyboardOptions) {
   const store = useStore();
 
   const handleKeyDown = useCallback(
@@ -18,8 +19,18 @@ export function useNodeKeyboard({ nodeId, divRef }: UseNodeKeyboardOptions) {
 
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
-        const newId = store.createNode(node.parentId, nodeId);
-        store.setActiveNode(newId, false);
+        if (isProjectTitle) {
+          // Focus first child, or create one if none exists
+          if (node.childrenIds.length > 0) {
+            store.setActiveNode(node.childrenIds[0], false);
+          } else {
+            const newId = store.createNode(nodeId);
+            store.setActiveNode(newId, false);
+          }
+        } else {
+          const newId = store.createNode(node.parentId, nodeId);
+          store.setActiveNode(newId, false);
+        }
         return;
       }
 

@@ -12,6 +12,7 @@ export function Sidebar() {
 
   const handleAddProject = useCallback(() => {
     const id = createNode(null);
+    createNode(id); // auto-create first child node
     setActiveProject(id);
     setActiveNode(id, false);
   }, [createNode, setActiveProject, setActiveNode]);
