@@ -57,10 +57,11 @@ export const useStore = create<StoreState>()(
       return id;
     },
 
-    updateContent(id: string, content: string) {
+    updateContent(id: string, content: string, mentions?: import('../types/node').MentionRef[]) {
       set((state) => {
         if (state.nodes[id]) {
           state.nodes[id].content = content;
+          if (mentions !== undefined) state.nodes[id].mentions = mentions;
           state.nodes[id].updatedAt = Date.now();
         }
       });

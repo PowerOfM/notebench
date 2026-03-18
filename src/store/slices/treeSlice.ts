@@ -9,7 +9,7 @@ export interface TreeState {
 export interface TreeActions {
   loadNodes: (nodes: NodeData[], rootIds: string[]) => void;
   createNode: (parentId: string | null, afterId?: string) => string;
-  updateContent: (id: string, content: string) => void;
+  updateContent: (id: string, content: string, mentions?: import('../../types/node').MentionRef[]) => void;
   deleteNode: (id: string) => void;
   indentNode: (id: string) => void;
   outdentNode: (id: string) => void;
