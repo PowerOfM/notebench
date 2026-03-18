@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { useStore } from '../../store';
 import { NodeContent } from '../NodeContent/NodeContent';
+import { StatusIndicator } from '../StatusIndicator/StatusIndicator';
 import styles from './NodeItem.module.css';
 
 interface NodeItemProps {
@@ -44,7 +45,11 @@ export function NodeItem({ nodeId, depth }: NodeItemProps) {
           <span className={styles.bullet} />
         )}
       </div>
-      <NodeContent nodeId={nodeId} />
+      <StatusIndicator nodeId={nodeId} />
+      <NodeContent
+        nodeId={nodeId}
+        strikethrough={node.statusType === 'checkable' && node.checked}
+      />
     </div>
   );
 }

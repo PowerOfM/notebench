@@ -15,4 +15,7 @@ export interface TreeActions {
   outdentNode: (id: string) => void;
   moveNode: (id: string, newParentId: string | null, newIndex: number) => void;
   toggleCollapsed: (id: string) => void;
+  toggleChecked: (id: string) => void;
+  cycleProjectStatus: (id: string) => void;
+  setStatusType: (id: string, statusType: import('../../types/node').StatusType) => void;
 }

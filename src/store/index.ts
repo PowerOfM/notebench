@@ -150,6 +150,54 @@ export const useStore = create<StoreState>()(
       });
     },
 
+    toggleChecked(id: string) {
+      set((state) => {
+        const node = state.nodes[id];
+        if (!node) return;
+        if (node.statusType !== 'checkable') {
+          node.statusType = 'checkable';
+          node.checked = true;
+        } else {
+          node.checked = !node.checked;
+        }
+        node.updatedAt = Date.now();
+      });
+    },
+
+    cycleProjectStatus(id: string) {
+      set((state) => {
+        const node = state.nodes[id];
+        if (!node) return;
+        if (node.statusType !== 'project') {
+          node.statusType = 'project';
+          node.projectStatus = 'todo';
+        } else {
+          const order = ['todo', 'in-progress', 'done', 'archived'] as const;
+          const idx = order.indexOf(node.projectStatus ?? 'todo');
+          node.projectStatus = order[(idx + 1) % order.length];
+        }
+        node.updatedAt = Date.now();
+      });
+    },
+
+    setStatusType(id: string, statusType: import('../types/node').StatusType) {
+      set((state) => {
+        const node = state.nodes[id];
+        if (!node) return;
+        node.statusType = statusType;
+        if (statusType === 'none') {
+          node.checked = false;
+          node.projectStatus = null;
+        } else if (statusType === 'checkable') {
+          node.projectStatus = null;
+        } else if (statusType === 'project') {
+          node.checked = false;
+          node.projectStatus = node.projectStatus ?? 'todo';
+        }
+        node.updatedAt = Date.now();
+      });
+    },
+
     // --- UI State ---
     activeNodeId: null,
     focusCursorAtEnd: false,

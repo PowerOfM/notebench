@@ -1,0 +1,91 @@
+.indicator {
+  min-width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  margin-top: calc(var(--node-padding-y) + 2px);
+  margin-right: 4px;
+  transition: opacity var(--transition-fast);
+  user-select: none;
+}
+
+.indicator:hover {
+  opacity: 0.8;
+}
+
+/* Checkbox */
+.checkbox {
+  width: 13px;
+  height: 13px;
+  border: 1.5px solid var(--color-text-muted);
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.checkbox.checked {
+  background: var(--color-done);
+  border-color: var(--color-done);
+}
+
+.checkmark {
+  color: #fff;
+  font-size: 9px;
+  line-height: 1;
+  font-weight: 700;
+}
+
+/* Project badge */
+.badge {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 1px 4px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  line-height: 14px;
+}
+
+.badge.todo {
+  background: color-mix(in srgb, var(--color-todo) 20%, transparent);
+  color: var(--color-todo);
+  border: 1px solid color-mix(in srgb, var(--color-todo) 40%, transparent);
+}
+
+.badge.inProgress {
+  background: color-mix(in srgb, var(--color-in-progress) 20%, transparent);
+  color: var(--color-in-progress);
+  border: 1px solid color-mix(in srgb, var(--color-in-progress) 40%, transparent);
+}
+
+.badge.done {
+  background: color-mix(in srgb, var(--color-done) 20%, transparent);
+  color: var(--color-done);
+  border: 1px solid color-mix(in srgb, var(--color-done) 40%, transparent);
+}
+
+.badge.archived {
+  background: color-mix(in srgb, var(--color-archived) 20%, transparent);
+  color: var(--color-archived);
+  border: 1px solid color-mix(in srgb, var(--color-archived) 40%, transparent);
+}
+
+/* None — show faint circle on hover */
+.noneHint {
+  width: 13px;
+  height: 13px;
+  border: 1.5px dashed transparent;
+  border-radius: 3px;
+  transition: border-color var(--transition-fast);
+}
+
+.indicator:hover .noneHint {
+  border-color: var(--color-text-faint);
+}

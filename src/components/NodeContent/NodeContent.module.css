@@ -13,3 +13,8 @@
   color: var(--color-text-faint);
   pointer-events: none;
 }
+
+.strikethrough {
+  text-decoration: line-through;
+  color: var(--color-text-muted);
+}

@@ -7,9 +7,10 @@ interface NodeContentProps {
   nodeId: string;
   isProjectTitle?: boolean;
   placeholder?: string;
+  strikethrough?: boolean;
 }
 
-export function NodeContent({ nodeId, isProjectTitle, placeholder = 'Type something...' }: NodeContentProps) {
+export function NodeContent({ nodeId, isProjectTitle, placeholder = 'Type something...', strikethrough }: NodeContentProps) {
   const divRef = useRef<HTMLDivElement>(null);
   const content = useStore((s) => s.nodes[nodeId]?.content ?? '');
   const activeNodeId = useStore((s) => s.activeNodeId);
@@ -67,7 +68,7 @@ export function NodeContent({ nodeId, isProjectTitle, placeholder = 'Type someth
   return (
     <div
       ref={divRef}
-      className={styles.editor}
+      className={`${styles.editor}${strikethrough ? ` ${styles.strikethrough}` : ''}`}
       contentEditable
       suppressContentEditableWarning
       data-node-id={nodeId}

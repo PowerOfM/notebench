@@ -34,6 +34,20 @@ export function useNodeKeyboard({ nodeId, divRef, isProjectTitle = false }: UseN
         return;
       }
 
+      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        const { statusType } = node;
+        if (statusType === 'checkable') {
+          store.toggleChecked(nodeId);
+        } else if (statusType === 'project') {
+          store.cycleProjectStatus(nodeId);
+        } else {
+          // Default: make it a checkable and check it
+          store.toggleChecked(nodeId);
+        }
+        return;
+      }
+
       if (e.key === 'Tab' && !e.shiftKey) {
         e.preventDefault();
         store.indentNode(nodeId);
