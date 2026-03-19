@@ -232,6 +232,40 @@ export const useStore = create<StoreState>()(
       return id;
     },
 
+    createDailyNode(date: string): string {
+      const id = generateId();
+      const now = Date.now();
+      // Format the date for display, e.g. "Thursday, March 19, 2026"
+      const [year, month, day] = date.split('-').map(Number);
+      const d = new Date(year, month - 1, day);
+      const content = d.toLocaleDateString('en-US', {
+        weekday: 'long',
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric',
+      });
+      set((state) => {
+        state.nodes[id] = {
+          id,
+          parentId: null,
+          content,
+          mentions: [],
+          statusType: 'none',
+          projectStatus: null,
+          checked: false,
+          collapsed: false,
+          childrenIds: [],
+          createdAt: now,
+          updatedAt: now,
+          isDaily: true,
+          dailyDate: date,
+          linkedNodeId: null,
+        };
+        state.rootIds.push(id);
+      });
+      return id;
+    },
+
     unlinkNode(linkNodeId: string) {
       set((state) => {
         const node = state.nodes[linkNodeId];

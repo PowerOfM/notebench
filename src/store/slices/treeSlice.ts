@@ -22,4 +22,6 @@ export interface TreeActions {
   createLinkNode: (targetId: string, afterSiblingId: string) => string;
   /** Detach the link: copy target content/status into link node, set linkedNodeId = null. */
   unlinkNode: (linkNodeId: string) => void;
+  /** Create a root-level daily node for the given ISO date. Returns new node id. */
+  createDailyNode: (date: string) => string;
 }

@@ -15,6 +15,7 @@ export function usePersistence() {
   const setActiveProject = useStore((s) => s.setActiveProject);
   const setProjectColumns = useStore((s) => s.setProjectColumns);
   const setDailyColumns = useStore((s) => s.setDailyColumns);
+  const createDailyNode = useStore((s) => s.createDailyNode);
 
   // Accumulated dirty state — persists across subscription calls so the
   // debounced timer always sees the full picture regardless of which
@@ -47,13 +48,28 @@ export function usePersistence() {
         if (meta?.value != null) setters[key](meta.value as number);
       });
 
-      // Auto-activate first root node as project if any
-      if (rootIds.length > 0) {
+      // Auto-create today's daily node if it doesn't exist yet
+      const todayDate = new Date().toISOString().slice(0, 10);
+      const hasTodayNode = allNodes.some(
+        (n) => n.isDaily && n.dailyDate === todayDate
+      );
+      if (!hasTodayNode) {
+        createDailyNode(todayDate);
+      }
+
+      // Auto-activate first non-daily root node, or fall back to today's daily
+      const firstProjectId = rootIds.find((id) => {
+        const n = allNodes.find((x) => x.id === id);
+        return n && !n.isDaily;
+      });
+      if (firstProjectId) {
+        setActiveProject(firstProjectId);
+      } else if (rootIds.length > 0) {
         setActiveProject(rootIds[0]);
       }
     }
     load();
-  }, [loadNodes, setActiveProject, setProjectColumns, setDailyColumns]);
+  }, [loadNodes, setActiveProject, setProjectColumns, setDailyColumns, createDailyNode]);
 
   // Save settings to meta when they change
   useEffect(() => {

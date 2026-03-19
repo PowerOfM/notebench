@@ -38,6 +38,39 @@
   background: var(--color-bg-active);
 }
 
+/* Today button */
+.todaySection {
+  padding: 4px 8px 8px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.todayBtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 8px;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-base);
+  color: var(--color-text-muted);
+  transition: color var(--transition-fast), background var(--transition-fast);
+}
+
+.todayBtn:hover {
+  color: var(--color-text);
+  background: var(--color-bg-hover);
+}
+
+.todayBtnActive {
+  color: var(--color-accent);
+  background: var(--color-bg-active);
+}
+
+.todayIcon {
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
 /* Footer */
 .footer {
   padding: 8px;

@@ -11,7 +11,10 @@ export function Sidebar() {
   const setActiveView = useStore((s) => s.setActiveView);
   const setSettingsPanelOpen = useStore((s) => s.setSettingsPanelOpen);
   const createNode = useStore((s) => s.createNode);
+  const createDailyNode = useStore((s) => s.createDailyNode);
   const setActiveNode = useStore((s) => s.setActiveNode);
+
+  const todayDate = new Date().toISOString().slice(0, 10);
 
   const handleAddProject = useCallback(() => {
     const id = createNode(null);
@@ -20,7 +23,28 @@ export function Sidebar() {
     setActiveNode(id, false);
   }, [createNode, setActiveProject, setActiveNode]);
 
+  const handleTodayClick = useCallback(() => {
+    const todayNode = Object.values(nodes).find(
+      (n) => n.isDaily && n.dailyDate === todayDate
+    );
+    if (todayNode) {
+      setActiveProject(todayNode.id);
+    } else {
+      const id = createDailyNode(todayDate);
+      setActiveProject(id);
+    }
+  }, [nodes, todayDate, createDailyNode, setActiveProject]);
+
   const rootNodes = rootIds.map((id) => nodes[id]).filter(Boolean);
+  const projectNodes = rootNodes.filter((n) => !n.isDaily);
+  const dailyNodes = rootNodes
+    .filter((n) => n.isDaily)
+    .sort((a, b) => (b.dailyDate ?? '').localeCompare(a.dailyDate ?? ''));
+  const pastDailyNodes = dailyNodes.filter((n) => n.dailyDate !== todayDate);
+
+  const isTodayActive =
+    activeView === 'project' &&
+    nodes[activeProjectId ?? '']?.dailyDate === todayDate;
 
   return (
     <aside className={styles.sidebar}>
@@ -45,7 +69,18 @@ export function Sidebar() {
         </button>
       </div>
 
-      {/* Project list header */}
+      {/* Today button */}
+      <div className={styles.todaySection}>
+        <button
+          className={`${styles.todayBtn} ${isTodayActive ? styles.todayBtnActive : ''}`}
+          onClick={handleTodayClick}
+        >
+          <span className={styles.todayIcon}>📅</span>
+          Today
+        </button>
+      </div>
+
+      {/* Projects section */}
       <div className={styles.header}>
         <span className={styles.title}>Projects</span>
         <button
@@ -58,10 +93,10 @@ export function Sidebar() {
         </button>
       </div>
       <div className={styles.list}>
-        {rootNodes.length === 0 && (
+        {projectNodes.length === 0 && (
           <p className={styles.empty}>No projects yet</p>
         )}
-        {rootNodes.map((node) => (
+        {projectNodes.map((node) => (
           <div
             key={node.id}
             className={`${styles.item} ${activeProjectId === node.id && activeView === 'project' ? styles.active : ''}`}
@@ -79,6 +114,35 @@ export function Sidebar() {
           </div>
         ))}
       </div>
+
+      {/* Past daily notes section */}
+      {pastDailyNodes.length > 0 && (
+        <>
+          <div className={styles.header}>
+            <span className={styles.title}>Daily Notes</span>
+          </div>
+          <div className={styles.list}>
+            {pastDailyNodes.slice(0, 7).map((node) => (
+              <div
+                key={node.id}
+                className={`${styles.item} ${activeProjectId === node.id && activeView === 'project' ? styles.active : ''}`}
+                onClick={() => setActiveProject(node.id)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ')
+                    setActiveProject(node.id);
+                }}
+              >
+                <span className={styles.itemIcon}>◷</span>
+                <span className={styles.itemLabel}>
+                  {node.dailyDate ?? node.content}
+                </span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
 
       {/* Footer */}
       <div className={styles.footer}>

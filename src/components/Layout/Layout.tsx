@@ -48,6 +48,11 @@ export function Layout() {
           <div className={styles.projectView}>
             <div className={styles.projectHeader}>
               <NodeContent nodeId={activeProjectId!} isProjectTitle placeholder="Project name..." />
+              {activeProject.isDaily && (
+                <p className={styles.dailyHint}>
+                  Use <kbd>@</kbd> to reference and link project nodes inline.
+                </p>
+              )}
             </div>
             <div className={styles.content}>
               {activeProject.childrenIds.length === 0 ? (
@@ -55,7 +60,7 @@ export function Layout() {
                   className={styles.emptyState}
                   style={{ height: 'auto', paddingTop: 32 }}
                 >
-                  <p>No nodes yet</p>
+                  <p>{activeProject.isDaily ? 'No entries yet' : 'No nodes yet'}</p>
                   <button
                     className={styles.emptyStateBtn}
                     onClick={handleAddFirstNode}

@@ -30,13 +30,17 @@ function ProjectCard({ projectId }: { projectId: string }) {
 }
 
 export function WorkbenchView() {
+  const nodes = useStore((s) => s.nodes);
   const rootIds = useStore((s) => s.rootIds);
   const projectColumns = useStore((s) => s.projectColumns);
   const dailyColumns = useStore((s) => s.dailyColumns);
 
-  // For now, all root nodes are projects (daily nodes arrive in Phase 6)
-  const projectIds = rootIds;
-  const dailyIds: string[] = []; // placeholder until Phase 6
+  const rootNodes = rootIds.map((id) => nodes[id]).filter(Boolean);
+  const projectIds = rootNodes.filter((n) => !n.isDaily).map((n) => n.id);
+  const dailyIds = rootNodes
+    .filter((n) => n.isDaily)
+    .sort((a, b) => (b.dailyDate ?? '').localeCompare(a.dailyDate ?? ''))
+    .map((n) => n.id);
 
   return (
     <div className={styles.workbench}>
@@ -69,7 +73,7 @@ export function WorkbenchView() {
           <span className={styles.paneTitle}>Daily Notes</span>
         </div>
         {dailyIds.length === 0 ? (
-          <div className={styles.emptyPane}>No daily notes yet</div>
+          <div className={styles.emptyPane}>No daily notes yet — click Today in the sidebar</div>
         ) : (
           <div
             className={styles.scroller}
