@@ -42,6 +42,7 @@ export const useStore = create<StoreState>()(
           updatedAt: now,
           isDaily: false,
           dailyDate: null,
+          linkedNodeId: null,
         };
         const siblings =
           parentId === null
@@ -57,10 +58,11 @@ export const useStore = create<StoreState>()(
       return id;
     },
 
-    updateContent(id: string, content: string) {
+    updateContent(id: string, content: string, mentions?: import('../types/node').MentionRef[]) {
       set((state) => {
         if (state.nodes[id]) {
           state.nodes[id].content = content;
+          if (mentions !== undefined) state.nodes[id].mentions = mentions;
           state.nodes[id].updatedAt = Date.now();
         }
       });
@@ -150,12 +152,112 @@ export const useStore = create<StoreState>()(
       });
     },
 
+    toggleChecked(id: string) {
+      set((state) => {
+        const node = state.nodes[id];
+        if (!node) return;
+        if (node.statusType !== 'checkable') {
+          node.statusType = 'checkable';
+          node.checked = true;
+        } else {
+          node.checked = !node.checked;
+        }
+        node.updatedAt = Date.now();
+      });
+    },
+
+    cycleProjectStatus(id: string) {
+      set((state) => {
+        const node = state.nodes[id];
+        if (!node) return;
+        if (node.statusType !== 'project') {
+          node.statusType = 'project';
+          node.projectStatus = 'todo';
+        } else {
+          const order = ['todo', 'in-progress', 'done', 'archived'] as const;
+          const idx = order.indexOf(node.projectStatus ?? 'todo');
+          node.projectStatus = order[(idx + 1) % order.length];
+        }
+        node.updatedAt = Date.now();
+      });
+    },
+
+    setStatusType(id: string, statusType: import('../types/node').StatusType) {
+      set((state) => {
+        const node = state.nodes[id];
+        if (!node) return;
+        node.statusType = statusType;
+        if (statusType === 'none') {
+          node.checked = false;
+          node.projectStatus = null;
+        } else if (statusType === 'checkable') {
+          node.projectStatus = null;
+        } else if (statusType === 'project') {
+          node.checked = false;
+          node.projectStatus = node.projectStatus ?? 'todo';
+        }
+        node.updatedAt = Date.now();
+      });
+    },
+
+    createLinkNode(targetId: string, afterSiblingId: string): string {
+      const id = generateId();
+      const now = Date.now();
+      set((state) => {
+        const afterNode = state.nodes[afterSiblingId];
+        if (!afterNode) return;
+        state.nodes[id] = {
+          id,
+          parentId: afterNode.parentId,
+          content: '',
+          mentions: [],
+          statusType: 'none',
+          projectStatus: null,
+          checked: false,
+          collapsed: false,
+          childrenIds: [],
+          createdAt: now,
+          updatedAt: now,
+          isDaily: false,
+          dailyDate: null,
+          linkedNodeId: targetId,
+        };
+        const siblings =
+          afterNode.parentId === null
+            ? state.rootIds
+            : (state.nodes[afterNode.parentId]?.childrenIds ?? state.rootIds);
+        const idx = siblings.indexOf(afterSiblingId);
+        siblings.splice(idx + 1, 0, id);
+      });
+      return id;
+    },
+
+    unlinkNode(linkNodeId: string) {
+      set((state) => {
+        const node = state.nodes[linkNodeId];
+        if (!node?.linkedNodeId) return;
+        const target = state.nodes[node.linkedNodeId];
+        if (target) {
+          node.content = target.content;
+          node.mentions = [...target.mentions];
+          node.statusType = target.statusType;
+          node.projectStatus = target.projectStatus;
+          node.checked = target.checked;
+        }
+        node.linkedNodeId = null;
+        node.updatedAt = Date.now();
+      });
+    },
+
     // --- UI State ---
     activeNodeId: null,
     focusCursorAtEnd: false,
     sidebarCollapsed: false,
     activeView: 'project',
     activeProjectId: null,
+    projectColumns: 2,
+    dailyColumns: 2,
+    settingsPanelOpen: false,
 
     setActiveNode(id: string | null, cursorAtEnd = false) {
       set((state) => {
@@ -180,6 +282,24 @@ export const useStore = create<StoreState>()(
       set((state) => {
         state.activeProjectId = id;
         state.activeView = 'project';
+      });
+    },
+
+    setProjectColumns(n: number) {
+      set((state) => {
+        state.projectColumns = Math.max(1, Math.min(4, n));
+      });
+    },
+
+    setDailyColumns(n: number) {
+      set((state) => {
+        state.dailyColumns = Math.max(1, Math.min(4, n));
+      });
+    },
+
+    setSettingsPanelOpen(open: boolean) {
+      set((state) => {
+        state.settingsPanelOpen = open;
       });
     },
   }))

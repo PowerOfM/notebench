@@ -5,9 +5,10 @@ import { flattenVisible } from '../lib/tree';
 interface UseNodeKeyboardOptions {
   nodeId: string;
   divRef: React.RefObject<HTMLDivElement | null>;
+  isProjectTitle?: boolean;
 }
 
-export function useNodeKeyboard({ nodeId, divRef }: UseNodeKeyboardOptions) {
+export function useNodeKeyboard({ nodeId, divRef, isProjectTitle = false }: UseNodeKeyboardOptions) {
   const store = useStore();
 
   const handleKeyDown = useCallback(
@@ -18,8 +19,36 @@ export function useNodeKeyboard({ nodeId, divRef }: UseNodeKeyboardOptions) {
 
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
-        const newId = store.createNode(node.parentId, nodeId);
-        store.setActiveNode(newId, false);
+        if (isProjectTitle) {
+          // Focus first child, or create one if none exists
+          if (node.childrenIds.length > 0) {
+            store.setActiveNode(node.childrenIds[0], false);
+          } else {
+            const newId = store.createNode(nodeId);
+            store.setActiveNode(newId, false);
+          }
+        } else {
+          const newId = store.createNode(node.parentId, nodeId);
+          // New sibling inherits the status type (but not the value)
+          if (node.statusType !== 'none') {
+            store.setStatusType(newId, node.statusType);
+          }
+          store.setActiveNode(newId, false);
+        }
+        return;
+      }
+
+      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        const { statusType } = node;
+        if (statusType === 'checkable') {
+          store.toggleChecked(nodeId);
+        } else if (statusType === 'project') {
+          store.cycleProjectStatus(nodeId);
+        } else {
+          // Default: make it a checkable and check it
+          store.toggleChecked(nodeId);
+        }
         return;
       }
 
@@ -32,6 +61,9 @@ export function useNodeKeyboard({ nodeId, divRef }: UseNodeKeyboardOptions) {
 
       if (e.key === 'Tab' && e.shiftKey) {
         e.preventDefault();
+        // Don't outdent if already a direct child of a root project node
+        const parent = node.parentId ? nodes[node.parentId] : null;
+        if (!parent || parent.parentId === null) return;
         store.outdentNode(nodeId);
         store.setActiveNode(nodeId, true);
         return;

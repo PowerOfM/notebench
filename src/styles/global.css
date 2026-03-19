@@ -53,6 +53,24 @@ a {
   min-height: 1.4em;
 }
 
+/* Mention chips — created imperatively inside contenteditable divs */
+.mention-chip {
+  display: inline-block;
+  background: color-mix(in srgb, var(--color-accent) 15%, transparent);
+  color: var(--color-accent);
+  border-radius: 3px;
+  padding: 0 3px;
+  font-size: 0.9em;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--transition-fast);
+  user-select: none;
+}
+
+.mention-chip:hover {
+  background: color-mix(in srgb, var(--color-accent) 28%, transparent);
+}
+
 /* Scrollbars */
 ::-webkit-scrollbar {
   width: 6px;
