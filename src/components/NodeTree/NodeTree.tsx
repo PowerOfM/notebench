@@ -35,10 +35,14 @@ export function NodeTree({ rootIds }: NodeTreeProps) {
   const flat = flattenVisible(rootIds, nodes);
   const sortedIds = flat.map((i) => i.id);
 
-  const projected =
+  const raw =
     activeId && overId
       ? getProjection(flat, activeId, overId, offsetX, INDENT_SIZE)
       : null;
+
+  // Prevent non-root nodes from being dropped at root level (would create a new project)
+  const isNonRootDrag = activeId ? (nodes[activeId]?.parentId !== null) : false;
+  const projected = raw && (raw.parentId !== null || !isNonRootDrag) ? raw : null;
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
