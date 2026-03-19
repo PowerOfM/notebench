@@ -4,6 +4,39 @@
   padding-left: calc(var(--indent-size) * var(--depth, 0));
   min-height: 28px;
   border-radius: var(--radius-sm);
+  position: relative;
+}
+
+.dragging {
+  opacity: 0;
+}
+
+.dragHandle {
+  width: 8px;
+  flex-shrink: 0;
+  align-self: stretch;
+  cursor: grab;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.dragHandle:active {
+  cursor: grabbing;
+}
+
+.dragHandle::before {
+  content: '⠿';
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--color-text-faint);
+  font-size: 12px;
+  padding-top: var(--node-padding-y);
+}
+
+.row:hover .dragHandle {
+  opacity: 1;
 }
 
 .row:hover {

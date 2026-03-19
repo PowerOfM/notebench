@@ -1,4 +1,6 @@
 import { useCallback } from 'react';
+import { useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { useStore } from '../../store';
 import { resolveLink } from '../../lib/linkResolver';
 import { NodeContent } from '../NodeContent/NodeContent';
@@ -17,11 +19,19 @@ export function NodeItem({ nodeId, depth }: NodeItemProps) {
   const unlinkNode = useStore((s) => s.unlinkNode);
   const deleteNode = useStore((s) => s.deleteNode);
 
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: nodeId });
+
   const handleCollapseClick = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      // Toggle the structural (link) node's own collapsed state
       toggleCollapsed(nodeId);
     },
     [nodeId, toggleCollapsed]
@@ -50,12 +60,22 @@ export function NodeItem({ nodeId, depth }: NodeItemProps) {
   const isLink = !!node.linkedNodeId;
   const effectiveNode = isLink ? resolveLink(nodeId, nodes) : node;
   const isBroken = isLink && !effectiveNode;
-  const cssVars = { '--depth': depth } as React.CSSProperties;
+  const cssVars = {
+    '--depth': depth,
+    transform: CSS.Transform.toString(transform),
+    transition,
+  } as React.CSSProperties;
 
   // ── Broken link ──────────────────────────────────────────────────────────────
   if (isBroken) {
     return (
-      <div className={`${styles.row} ${styles.brokenRow}`} style={cssVars}>
+      <div
+        ref={setNodeRef}
+        className={`${styles.row} ${styles.brokenRow}`}
+        style={cssVars}
+        {...attributes}
+      >
+        <div className={styles.dragHandle} {...listeners} />
         <div className={styles.gutter}>
           <span className={styles.linkIcon}>⛓</span>
         </div>
@@ -72,40 +92,47 @@ export function NodeItem({ nodeId, depth }: NodeItemProps) {
     );
   }
 
-  // For linked nodes, use the effective node's children to decide collapse arrow;
-  // but collapse toggle always acts on the structural node.
   const effectiveId = effectiveNode!.id;
   const hasChildren = effectiveNode!.childrenIds.length > 0;
 
   return (
     <div
-      className={`${styles.row}${isLink ? ` ${styles.linkedRow}` : ''}`}
+      ref={setNodeRef}
+      className={`${styles.row}${isLink ? ` ${styles.linkedRow}` : ''}${isDragging ? ` ${styles.dragging}` : ''}`}
       style={cssVars}
+      {...attributes}
     >
+      <div className={styles.dragHandle} {...listeners} title="Drag to reorder" />
       <div className={styles.gutter}>
         {hasChildren ? (
           <button
             className={`${styles.collapseBtn} ${!node.collapsed ? styles.expanded : ''} ${styles.visible}`}
             onClick={handleCollapseClick}
+            onPointerDown={(e) => e.stopPropagation()}
             tabIndex={-1}
             aria-label={node.collapsed ? 'Expand' : 'Collapse'}
           >
             ▶
           </button>
         ) : (
-          <span className={isLink ? styles.linkIcon : styles.bullet} title={isLink ? 'Linked node' : undefined} />
+          <span
+            className={isLink ? styles.linkIcon : styles.bullet}
+            title={isLink ? 'Linked node' : undefined}
+          />
         )}
       </div>
-      {/* Show chain icon inline when the node also has the expand arrow */}
       {isLink && hasChildren && (
-        <span className={styles.linkIconInline} title="Linked node">⛓</span>
+        <span className={styles.linkIconInline} title="Linked node">
+          ⛓
+        </span>
       )}
-      {/* StatusIndicator and NodeContent act on the effective (target) node */}
       <StatusIndicator nodeId={effectiveId} />
       <NodeContent
         nodeId={nodeId}
         effectiveNodeId={isLink ? effectiveId : undefined}
-        strikethrough={effectiveNode!.statusType === 'checkable' && effectiveNode!.checked}
+        strikethrough={
+          effectiveNode!.statusType === 'checkable' && effectiveNode!.checked
+        }
       />
     </div>
   );
