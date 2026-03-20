@@ -5,11 +5,14 @@ import { NodeTree } from '../NodeTree/NodeTree';
 import { NodeContent } from '../NodeContent/NodeContent';
 import { WorkbenchView } from '../Workbench/WorkbenchView';
 import { SettingsPanel } from '../Settings/SettingsPanel';
+import { FloatingToolbar } from '../FloatingToolbar/FloatingToolbar';
 import styles from './Layout.module.css';
 
 export function Layout() {
   const activeProjectId = useStore((s) => s.activeProjectId);
   const activeView = useStore((s) => s.activeView);
+  const sidebarCollapsed = useStore((s) => s.sidebarCollapsed);
+  const setSidebarCollapsed = useStore((s) => s.setSidebarCollapsed);
   const nodes = useStore((s) => s.nodes);
   const createNode = useStore((s) => s.createNode);
   const setActiveNode = useStore((s) => s.setActiveNode);
@@ -31,9 +34,31 @@ export function Layout() {
   }, [activeProjectId, createNode, setActiveNode]);
 
   return (
-    <div className={styles.layout}>
-      <Sidebar />
+    <div className={`${styles.layout}${sidebarCollapsed ? ` ${styles.sidebarCollapsed}` : ''}`}>
+      {/* Mobile backdrop — closes sidebar when tapping outside */}
+      {!sidebarCollapsed && (
+        <div
+          className={styles.sidebarBackdrop}
+          onClick={() => setSidebarCollapsed(true)}
+          aria-hidden="true"
+        />
+      )}
+
+      <div className={`${styles.sidebarWrapper}${sidebarCollapsed ? ` ${styles.sidebarHidden}` : ''}`}>
+        <Sidebar />
+      </div>
+
       <main className={styles.main}>
+        {/* Mobile hamburger toggle */}
+        <button
+          className={styles.menuToggle}
+          onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+          aria-label={sidebarCollapsed ? 'Open sidebar' : 'Close sidebar'}
+          aria-expanded={!sidebarCollapsed}
+        >
+          ☰
+        </button>
+
         {activeView === 'workbench' ? (
           <WorkbenchView />
         ) : !activeProject ? (
@@ -74,6 +99,8 @@ export function Layout() {
             </div>
           </div>
         )}
+
+        <FloatingToolbar />
       </main>
       <SettingsPanel />
     </div>

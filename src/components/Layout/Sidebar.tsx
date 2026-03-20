@@ -2,6 +2,16 @@ import { useCallback } from 'react';
 import { useStore } from '../../store';
 import styles from './Sidebar.module.css';
 
+/** Close the sidebar on narrow screens after a navigation action. */
+function useCloseSidebarOnMobile() {
+  const setSidebarCollapsed = useStore((s) => s.setSidebarCollapsed);
+  return useCallback(() => {
+    if (window.matchMedia('(max-width: 768px)').matches) {
+      setSidebarCollapsed(true);
+    }
+  }, [setSidebarCollapsed]);
+}
+
 export function Sidebar() {
   const nodes = useStore((s) => s.nodes);
   const rootIds = useStore((s) => s.rootIds);
@@ -13,6 +23,7 @@ export function Sidebar() {
   const createNode = useStore((s) => s.createNode);
   const createDailyNode = useStore((s) => s.createDailyNode);
   const setActiveNode = useStore((s) => s.setActiveNode);
+  const closeSidebar = useCloseSidebarOnMobile();
 
   const todayDate = new Date().toISOString().slice(0, 10);
 
@@ -33,7 +44,8 @@ export function Sidebar() {
       const id = createDailyNode(todayDate);
       setActiveProject(id);
     }
-  }, [nodes, todayDate, createDailyNode, setActiveProject]);
+    closeSidebar();
+  }, [nodes, todayDate, createDailyNode, setActiveProject, closeSidebar]);
 
   const rootNodes = rootIds.map((id) => nodes[id]).filter(Boolean);
   const projectNodes = rootNodes.filter((n) => !n.isDaily);
@@ -100,11 +112,11 @@ export function Sidebar() {
           <div
             key={node.id}
             className={`${styles.item} ${activeProjectId === node.id && activeView === 'project' ? styles.active : ''}`}
-            onClick={() => setActiveProject(node.id)}
+            onClick={() => { setActiveProject(node.id); closeSidebar(); }}
             role="button"
             tabIndex={0}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') setActiveProject(node.id);
+              if (e.key === 'Enter' || e.key === ' ') { setActiveProject(node.id); closeSidebar(); }
             }}
           >
             <span className={styles.itemIcon}>◈</span>
@@ -126,12 +138,13 @@ export function Sidebar() {
               <div
                 key={node.id}
                 className={`${styles.item} ${activeProjectId === node.id && activeView === 'project' ? styles.active : ''}`}
-                onClick={() => setActiveProject(node.id)}
+                onClick={() => { setActiveProject(node.id); closeSidebar(); }}
                 role="button"
                 tabIndex={0}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ')
-                    setActiveProject(node.id);
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    setActiveProject(node.id); closeSidebar();
+                  }
                 }}
               >
                 <span className={styles.itemIcon}>◷</span>

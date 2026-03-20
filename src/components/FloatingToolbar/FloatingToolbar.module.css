@@ -1,0 +1,48 @@
+/* Hidden on desktop/mouse devices */
+.toolbar {
+  display: none;
+}
+
+/* Show on touch-primary devices */
+@media (hover: none) and (pointer: coarse) {
+  .toolbar {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 52px;
+    background: var(--color-bg-secondary);
+    border-top: 1px solid var(--color-border);
+    z-index: 50;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 0 8px;
+    /* Safe area inset for iOS home bar */
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+}
+
+.btn {
+  flex: 1;
+  max-width: 80px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  font-size: 18px;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  transition: color var(--transition-fast), background var(--transition-fast);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.btn:active {
+  color: var(--color-text);
+  background: var(--color-bg-active);
+  border-color: var(--color-border);
+}

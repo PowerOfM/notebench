@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useStore } from '../../store';
@@ -12,15 +12,21 @@ interface NodeItemProps {
   depth: number;
 }
 
-export function NodeItem({ nodeId, depth }: NodeItemProps) {
+export const NodeItem = memo(function NodeItem({ nodeId, depth }: NodeItemProps) {
+  // Subscribe only to the specific node — not the full nodes map
   const node = useStore((s) => s.nodes[nodeId]);
-  const nodes = useStore((s) => s.nodes);
+
+  // If this is a link node, also subscribe to its direct target so we
+  // re-render when the target's content/status changes
+  const linkedTargetId = node?.linkedNodeId ?? null;
+  useStore((s) => (linkedTargetId ? s.nodes[linkedTargetId] : null));
+
   const toggleCollapsed = useStore((s) => s.toggleCollapsed);
   const unlinkNode = useStore((s) => s.unlinkNode);
   const deleteNode = useStore((s) => s.deleteNode);
 
   const {
-    attributes,
+    attributes: { role: _role, ...attributes },
     listeners,
     setNodeRef,
     transform,
@@ -58,7 +64,9 @@ export function NodeItem({ nodeId, depth }: NodeItemProps) {
   if (!node) return null;
 
   const isLink = !!node.linkedNodeId;
-  const effectiveNode = isLink ? resolveLink(nodeId, nodes) : node;
+  // Use getState() for resolveLink — reads current state without subscribing to
+  // the full nodes map (avoids re-rendering all NodeItems on any node change)
+  const effectiveNode = isLink ? resolveLink(nodeId, useStore.getState().nodes) : node;
   const isBroken = isLink && !effectiveNode;
   const cssVars = {
     '--depth': depth,
@@ -71,20 +79,22 @@ export function NodeItem({ nodeId, depth }: NodeItemProps) {
     return (
       <div
         ref={setNodeRef}
+        role="treeitem"
+        aria-level={depth + 1}
         className={`${styles.row} ${styles.brokenRow}`}
         style={cssVars}
         {...attributes}
       >
-        <div className={styles.dragHandle} {...listeners} />
+        <div className={styles.dragHandle} {...listeners} aria-label="Drag to reorder" />
         <div className={styles.gutter}>
-          <span className={styles.linkIcon}>⛓</span>
+          <span className={styles.linkIcon} aria-hidden="true">⛓</span>
         </div>
         <span className={styles.brokenText}>Broken link</span>
         <div className={styles.brokenActions}>
-          <button className={styles.brokenBtn} onMouseDown={handleUnlink}>
+          <button className={styles.brokenBtn} onMouseDown={handleUnlink} aria-label="Unlink broken node">
             Unlink
           </button>
-          <button className={styles.brokenBtn} onMouseDown={handleDelete}>
+          <button className={styles.brokenBtn} onMouseDown={handleDelete} aria-label="Delete broken node">
             Delete
           </button>
         </div>
@@ -98,11 +108,14 @@ export function NodeItem({ nodeId, depth }: NodeItemProps) {
   return (
     <div
       ref={setNodeRef}
+      role="treeitem"
+      aria-level={depth + 1}
+      aria-expanded={hasChildren ? !node.collapsed : undefined}
       className={`${styles.row}${isLink ? ` ${styles.linkedRow}` : ''}${isDragging ? ` ${styles.dragging}` : ''}`}
       style={cssVars}
       {...attributes}
     >
-      <div className={styles.dragHandle} {...listeners} title="Drag to reorder" />
+      <div className={styles.dragHandle} {...listeners} aria-label="Drag to reorder" />
       <div className={styles.gutter}>
         {hasChildren ? (
           <button
@@ -117,12 +130,12 @@ export function NodeItem({ nodeId, depth }: NodeItemProps) {
         ) : (
           <span
             className={isLink ? styles.linkIcon : styles.bullet}
-            title={isLink ? 'Linked node' : undefined}
+            aria-hidden="true"
           />
         )}
       </div>
       {isLink && hasChildren && (
-        <span className={styles.linkIconInline} title="Linked node">
+        <span className={styles.linkIconInline} aria-label="Linked node" title="Linked node">
           ⛓
         </span>
       )}
@@ -136,4 +149,4 @@ export function NodeItem({ nodeId, depth }: NodeItemProps) {
       />
     </div>
   );
-}
+});

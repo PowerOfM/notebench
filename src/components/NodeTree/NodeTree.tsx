@@ -90,7 +90,7 @@ export function NodeTree({ rootIds }: NodeTreeProps) {
       onDragCancel={resetState}
     >
       <SortableContext items={sortedIds} strategy={verticalListSortingStrategy}>
-        <div className={styles.tree}>
+        <div className={styles.tree} role="tree" aria-label="Notes tree">
           {flat.map(({ id, depth }) => {
             const isOver =
               activeId && overId === id && activeId !== id && projected;
