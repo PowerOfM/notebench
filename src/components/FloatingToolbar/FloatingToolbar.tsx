@@ -14,6 +14,10 @@ export function FloatingToolbar() {
   const toggleChecked = useStore((s) => s.toggleChecked);
   const createNode = useStore((s) => s.createNode);
   const setActiveNode = useStore((s) => s.setActiveNode);
+  const undo = useStore((s) => s.undo);
+  const redo = useStore((s) => s.redo);
+  const canUndo = useStore((s) => s.canUndo);
+  const canRedo = useStore((s) => s.canRedo);
   const node = useStore((s) => (activeNodeId ? s.nodes[activeNodeId] : null));
 
   if (!activeNodeId || !node) return null;
@@ -36,6 +40,25 @@ export function FloatingToolbar() {
 
   return (
     <div className={styles.toolbar} role="toolbar" aria-label="Node actions">
+      <button
+        className={styles.btn}
+        onPointerDown={(e) => { e.preventDefault(); undo(); }}
+        aria-label="Undo (Cmd+Z)"
+        title="Undo"
+        disabled={!canUndo}
+      >
+        ↩
+      </button>
+      <button
+        className={styles.btn}
+        onPointerDown={(e) => { e.preventDefault(); redo(); }}
+        aria-label="Redo (Cmd+Shift+Z)"
+        title="Redo"
+        disabled={!canRedo}
+      >
+        ↪
+      </button>
+      <div className={styles.separator} aria-hidden="true" />
       <button
         className={styles.btn}
         onPointerDown={(e) => { e.preventDefault(); outdentNode(activeNodeId); }}

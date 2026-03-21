@@ -46,3 +46,16 @@
   background: var(--color-bg-active);
   border-color: var(--color-border);
 }
+
+.btn:disabled {
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+.separator {
+  width: 1px;
+  height: 24px;
+  background: var(--color-border);
+  flex-shrink: 0;
+  margin: 0 4px;
+}

@@ -7,6 +7,8 @@ export interface UIState {
   projectColumns: number;
   dailyColumns: number;
   settingsPanelOpen: boolean;
+  canUndo: boolean;
+  canRedo: boolean;
 }
 
 export interface UIActions {
@@ -17,4 +19,6 @@ export interface UIActions {
   setProjectColumns: (n: number) => void;
   setDailyColumns: (n: number) => void;
   setSettingsPanelOpen: (open: boolean) => void;
+  undo: () => void;
+  redo: () => void;
 }

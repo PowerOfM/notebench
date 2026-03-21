@@ -1,12 +1,27 @@
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
-import type { NodeData } from '../types/node';
+import type { NodeData, NodeMap } from '../types/node';
 import { generateId } from '../lib/id';
 import { getSiblings } from '../lib/tree';
 import type { UIState, UIActions } from './slices/uiSlice';
 import type { TreeState, TreeActions } from './slices/treeSlice';
 
 type StoreState = TreeState & TreeActions & UIState & UIActions;
+
+// ── History ──────────────────────────────────────────────────────────────────
+// Stored outside Zustand/Immer state to avoid draft-proxy complications when
+// restoring previous snapshots. canUndo/canRedo stay in reactive state for UI.
+interface Snapshot { nodes: NodeMap; rootIds: string[] }
+const past: Snapshot[] = [];
+const future: Snapshot[] = [];
+const MAX_HISTORY = 50;
+let lastTextSnapshotAt = 0;
+
+function takeSnapshot(nodes: NodeMap, rootIds: string[]) {
+  past.push({ nodes, rootIds: [...rootIds] });
+  if (past.length > MAX_HISTORY) past.shift();
+  future.length = 0;
+}
 
 export const useStore = create<StoreState>()(
   immer((set, _get) => ({
@@ -27,7 +42,11 @@ export const useStore = create<StoreState>()(
     createNode(parentId: string | null, afterId?: string): string {
       const id = generateId();
       const now = Date.now();
+      const { nodes, rootIds } = _get();
+      takeSnapshot(nodes, rootIds);
       set((state) => {
+        state.canUndo = true;
+        state.canRedo = false;
         state.nodes[id] = {
           id,
           parentId,
@@ -59,17 +78,32 @@ export const useStore = create<StoreState>()(
     },
 
     updateContent(id: string, content: string, mentions?: import('../types/node').MentionRef[]) {
+      const now = Date.now();
+      const shouldSnapshot = now - lastTextSnapshotAt >= 1000;
+      if (shouldSnapshot) {
+        lastTextSnapshotAt = now;
+        const { nodes, rootIds } = _get();
+        takeSnapshot(nodes, rootIds);
+      }
       set((state) => {
         if (state.nodes[id]) {
           state.nodes[id].content = content;
           if (mentions !== undefined) state.nodes[id].mentions = mentions;
-          state.nodes[id].updatedAt = Date.now();
+          state.nodes[id].updatedAt = now;
+          if (shouldSnapshot) {
+            state.canUndo = true;
+            state.canRedo = false;
+          }
         }
       });
     },
 
     deleteNode(id: string) {
+      const { nodes, rootIds } = _get();
+      takeSnapshot(nodes, rootIds);
       set((state) => {
+        state.canUndo = true;
+        state.canRedo = false;
         const node = state.nodes[id];
         if (!node) return;
         const siblings =
@@ -89,7 +123,11 @@ export const useStore = create<StoreState>()(
     },
 
     indentNode(id: string) {
+      const { nodes, rootIds } = _get();
+      takeSnapshot(nodes, rootIds);
       set((state) => {
+        state.canUndo = true;
+        state.canRedo = false;
         const node = state.nodes[id];
         if (!node) return;
         const siblings = getSiblings(node, state.nodes, state.rootIds);
@@ -107,7 +145,11 @@ export const useStore = create<StoreState>()(
     },
 
     outdentNode(id: string) {
+      const { nodes, rootIds } = _get();
+      takeSnapshot(nodes, rootIds);
       set((state) => {
+        state.canUndo = true;
+        state.canRedo = false;
         const node = state.nodes[id];
         if (!node || node.parentId === null) return;
         const parent = state.nodes[node.parentId];
@@ -123,7 +165,11 @@ export const useStore = create<StoreState>()(
     },
 
     moveNode(id: string, newParentId: string | null, newIndex: number) {
+      const { nodes, rootIds } = _get();
+      takeSnapshot(nodes, rootIds);
       set((state) => {
+        state.canUndo = true;
+        state.canRedo = false;
         const node = state.nodes[id];
         if (!node) return;
         const oldSiblings =
@@ -143,6 +189,7 @@ export const useStore = create<StoreState>()(
     },
 
     toggleCollapsed(id: string) {
+      // Collapse is a view-only toggle — not worth undoing
       set((state) => {
         const node = state.nodes[id];
         if (node) {
@@ -153,7 +200,11 @@ export const useStore = create<StoreState>()(
     },
 
     toggleChecked(id: string) {
+      const { nodes, rootIds } = _get();
+      takeSnapshot(nodes, rootIds);
       set((state) => {
+        state.canUndo = true;
+        state.canRedo = false;
         const node = state.nodes[id];
         if (!node) return;
         if (node.statusType !== 'checkable') {
@@ -167,7 +218,11 @@ export const useStore = create<StoreState>()(
     },
 
     cycleProjectStatus(id: string) {
+      const { nodes, rootIds } = _get();
+      takeSnapshot(nodes, rootIds);
       set((state) => {
+        state.canUndo = true;
+        state.canRedo = false;
         const node = state.nodes[id];
         if (!node) return;
         if (node.statusType !== 'project') {
@@ -183,7 +238,11 @@ export const useStore = create<StoreState>()(
     },
 
     setStatusType(id: string, statusType: import('../types/node').StatusType) {
+      const { nodes, rootIds } = _get();
+      takeSnapshot(nodes, rootIds);
       set((state) => {
+        state.canUndo = true;
+        state.canRedo = false;
         const node = state.nodes[id];
         if (!node) return;
         node.statusType = statusType;
@@ -203,7 +262,11 @@ export const useStore = create<StoreState>()(
     createLinkNode(targetId: string, afterSiblingId: string): string {
       const id = generateId();
       const now = Date.now();
+      const { nodes, rootIds } = _get();
+      takeSnapshot(nodes, rootIds);
       set((state) => {
+        state.canUndo = true;
+        state.canRedo = false;
         const afterNode = state.nodes[afterSiblingId];
         if (!afterNode) return;
         state.nodes[id] = {
@@ -235,7 +298,6 @@ export const useStore = create<StoreState>()(
     createDailyNode(date: string): string {
       const id = generateId();
       const now = Date.now();
-      // Format the date for display, e.g. "Thursday, March 19, 2026"
       const [year, month, day] = date.split('-').map(Number);
       const d = new Date(year, month - 1, day);
       const content = d.toLocaleDateString('en-US', {
@@ -244,6 +306,7 @@ export const useStore = create<StoreState>()(
         day: 'numeric',
         year: 'numeric',
       });
+      // System-initiated — do not snapshot
       set((state) => {
         state.nodes[id] = {
           id,
@@ -267,7 +330,11 @@ export const useStore = create<StoreState>()(
     },
 
     unlinkNode(linkNodeId: string) {
+      const { nodes, rootIds } = _get();
+      takeSnapshot(nodes, rootIds);
       set((state) => {
+        state.canUndo = true;
+        state.canRedo = false;
         const node = state.nodes[linkNodeId];
         if (!node?.linkedNodeId) return;
         const target = state.nodes[node.linkedNodeId];
@@ -292,6 +359,8 @@ export const useStore = create<StoreState>()(
     projectColumns: 2,
     dailyColumns: 2,
     settingsPanelOpen: false,
+    canUndo: false,
+    canRedo: false,
 
     setActiveNode(id: string | null, cursorAtEnd = false) {
       set((state) => {
@@ -335,6 +404,37 @@ export const useStore = create<StoreState>()(
       set((state) => {
         state.settingsPanelOpen = open;
       });
+    },
+
+    undo() {
+      if (past.length === 0) return;
+      const prev = past.pop()!;
+      const { nodes, rootIds } = _get();
+      future.push({ nodes, rootIds: [...rootIds] });
+      // Pass a plain object to bypass Immer's produce — the immer middleware
+      // only wraps function updaters; plain objects go straight to zustand set.
+      (set as unknown as (s: Partial<StoreState>) => void)({
+        nodes: prev.nodes,
+        rootIds: prev.rootIds,
+        canUndo: past.length > 0,
+        canRedo: true,
+      });
+      // Reset so the next typing burst gets a fresh snapshot
+      lastTextSnapshotAt = 0;
+    },
+
+    redo() {
+      if (future.length === 0) return;
+      const next = future.pop()!;
+      const { nodes, rootIds } = _get();
+      past.push({ nodes, rootIds: [...rootIds] });
+      (set as unknown as (s: Partial<StoreState>) => void)({
+        nodes: next.nodes,
+        rootIds: next.rootIds,
+        canUndo: true,
+        canRedo: future.length > 0,
+      });
+      lastTextSnapshotAt = 0;
     },
   }))
 );
