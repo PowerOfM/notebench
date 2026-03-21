@@ -1,22 +1,29 @@
-import { useState } from 'react';
 import {
+  closestCenter,
   DndContext,
   DragOverlay,
-  closestCenter,
   PointerSensor,
   useSensor,
   useSensors,
-  type DragStartEvent,
+  type DragEndEvent,
   type DragMoveEvent,
   type DragOverEvent,
-  type DragEndEvent,
-} from '@dnd-kit/core';
-import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { useStore } from '../../store';
-import { flattenVisible, getProjection, getDescendantIds } from '../../lib/tree';
-import { NodeItem } from './NodeItem';
-import { DragOverlayNode } from './DragOverlayNode';
-import styles from './NodeTree.module.css';
+  type DragStartEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { useState } from "react";
+import {
+  flattenVisible,
+  getDescendantIds,
+  getProjection,
+} from "../../lib/tree";
+import { useStore } from "../../store";
+import { DragOverlayNode } from "./DragOverlayNode";
+import { NodeItem } from "./NodeItem";
+import styles from "./NodeTree.module.css";
 
 const INDENT_SIZE = 24;
 
@@ -41,11 +48,12 @@ export function NodeTree({ rootIds }: NodeTreeProps) {
       : null;
 
   // Prevent non-root nodes from being dropped at root level (would create a new project)
-  const isNonRootDrag = activeId ? (nodes[activeId]?.parentId !== null) : false;
-  const projected = raw && (raw.parentId !== null || !isNonRootDrag) ? raw : null;
+  const isNonRootDrag = activeId ? nodes[activeId]?.parentId !== null : false;
+  const projected =
+    raw && (raw.parentId !== null || !isNonRootDrag) ? raw : null;
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
   );
 
   function resetState() {
@@ -101,7 +109,7 @@ export function NodeTree({ rootIds }: NodeTreeProps) {
                   <div
                     className={styles.dropLine}
                     style={
-                      { '--depth': projected!.depth } as React.CSSProperties
+                      { "--depth": projected!.depth } as React.CSSProperties
                     }
                   />
                 )}

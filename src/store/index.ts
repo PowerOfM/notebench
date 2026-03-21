@@ -1,17 +1,20 @@
-import { create } from 'zustand';
-import { immer } from 'zustand/middleware/immer';
-import type { NodeData, NodeMap } from '../types/node';
-import { generateId } from '../lib/id';
-import { getSiblings } from '../lib/tree';
-import type { UIState, UIActions } from './slices/uiSlice';
-import type { TreeState, TreeActions } from './slices/treeSlice';
+import { create } from "zustand";
+import { immer } from "zustand/middleware/immer";
+import { generateId } from "../lib/id";
+import { getSiblings } from "../lib/tree";
+import type { NodeData, NodeMap } from "../types/node";
+import type { TreeActions, TreeState } from "./slices/treeSlice";
+import type { UIActions, UIState } from "./slices/uiSlice";
 
 type StoreState = TreeState & TreeActions & UIState & UIActions;
 
 // ── History ──────────────────────────────────────────────────────────────────
 // Stored outside Zustand/Immer state to avoid draft-proxy complications when
 // restoring previous snapshots. canUndo/canRedo stay in reactive state for UI.
-interface Snapshot { nodes: NodeMap; rootIds: string[] }
+interface Snapshot {
+  nodes: NodeMap;
+  rootIds: string[];
+}
 const past: Snapshot[] = [];
 const future: Snapshot[] = [];
 const MAX_HISTORY = 50;
@@ -50,9 +53,9 @@ export const useStore = create<StoreState>()(
         state.nodes[id] = {
           id,
           parentId,
-          content: '',
+          content: "",
           mentions: [],
-          statusType: 'none',
+          statusType: "none",
           projectStatus: null,
           checked: false,
           collapsed: false,
@@ -61,7 +64,7 @@ export const useStore = create<StoreState>()(
           updatedAt: now,
           isDaily: false,
           dailyDate: null,
-          linkedNodeId: null,
+          linkId: null,
         };
         const siblings =
           parentId === null
@@ -77,7 +80,11 @@ export const useStore = create<StoreState>()(
       return id;
     },
 
-    updateContent(id: string, content: string, mentions?: import('../types/node').MentionRef[]) {
+    updateContent(
+      id: string,
+      content: string,
+      mentions?: import("../types/node").MentionRef[],
+    ) {
       const now = Date.now();
       const shouldSnapshot = now - lastTextSnapshotAt >= 1000;
       if (shouldSnapshot) {
@@ -207,8 +214,8 @@ export const useStore = create<StoreState>()(
         state.canRedo = false;
         const node = state.nodes[id];
         if (!node) return;
-        if (node.statusType !== 'checkable') {
-          node.statusType = 'checkable';
+        if (node.statusType !== "checkable") {
+          node.statusType = "checkable";
           node.checked = true;
         } else {
           node.checked = !node.checked;
@@ -225,19 +232,19 @@ export const useStore = create<StoreState>()(
         state.canRedo = false;
         const node = state.nodes[id];
         if (!node) return;
-        if (node.statusType !== 'project') {
-          node.statusType = 'project';
-          node.projectStatus = 'todo';
+        if (node.statusType !== "project") {
+          node.statusType = "project";
+          node.projectStatus = "todo";
         } else {
-          const order = ['todo', 'in-progress', 'done', 'archived'] as const;
-          const idx = order.indexOf(node.projectStatus ?? 'todo');
+          const order = ["todo", "in-progress", "done", "archived"] as const;
+          const idx = order.indexOf(node.projectStatus ?? "todo");
           node.projectStatus = order[(idx + 1) % order.length];
         }
         node.updatedAt = Date.now();
       });
     },
 
-    setStatusType(id: string, statusType: import('../types/node').StatusType) {
+    setStatusType(id: string, statusType: import("../types/node").StatusType) {
       const { nodes, rootIds } = _get();
       takeSnapshot(nodes, rootIds);
       set((state) => {
@@ -246,14 +253,14 @@ export const useStore = create<StoreState>()(
         const node = state.nodes[id];
         if (!node) return;
         node.statusType = statusType;
-        if (statusType === 'none') {
+        if (statusType === "none") {
           node.checked = false;
           node.projectStatus = null;
-        } else if (statusType === 'checkable') {
+        } else if (statusType === "checkable") {
           node.projectStatus = null;
-        } else if (statusType === 'project') {
+        } else if (statusType === "project") {
           node.checked = false;
-          node.projectStatus = node.projectStatus ?? 'todo';
+          node.projectStatus = node.projectStatus ?? "todo";
         }
         node.updatedAt = Date.now();
       });
@@ -272,9 +279,9 @@ export const useStore = create<StoreState>()(
         state.nodes[id] = {
           id,
           parentId: afterNode.parentId,
-          content: '',
+          content: "",
           mentions: [],
-          statusType: 'none',
+          statusType: "none",
           projectStatus: null,
           checked: false,
           collapsed: false,
@@ -283,7 +290,7 @@ export const useStore = create<StoreState>()(
           updatedAt: now,
           isDaily: false,
           dailyDate: null,
-          linkedNodeId: targetId,
+          linkId: targetId,
         };
         const siblings =
           afterNode.parentId === null
@@ -298,13 +305,13 @@ export const useStore = create<StoreState>()(
     createDailyNode(date: string): string {
       const id = generateId();
       const now = Date.now();
-      const [year, month, day] = date.split('-').map(Number);
+      const [year, month, day] = date.split("-").map(Number);
       const d = new Date(year, month - 1, day);
-      const content = d.toLocaleDateString('en-US', {
-        weekday: 'long',
-        month: 'long',
-        day: 'numeric',
-        year: 'numeric',
+      const content = d.toLocaleDateString("en-US", {
+        weekday: "long",
+        month: "long",
+        day: "numeric",
+        year: "numeric",
       });
       // System-initiated — do not snapshot
       set((state) => {
@@ -313,7 +320,7 @@ export const useStore = create<StoreState>()(
           parentId: null,
           content,
           mentions: [],
-          statusType: 'none',
+          statusType: "none",
           projectStatus: null,
           checked: false,
           collapsed: false,
@@ -322,7 +329,7 @@ export const useStore = create<StoreState>()(
           updatedAt: now,
           isDaily: true,
           dailyDate: date,
-          linkedNodeId: null,
+          linkId: null,
         };
         state.rootIds.push(id);
       });
@@ -336,16 +343,16 @@ export const useStore = create<StoreState>()(
         state.canUndo = true;
         state.canRedo = false;
         const node = state.nodes[linkNodeId];
-        if (!node?.linkedNodeId) return;
-        const target = state.nodes[node.linkedNodeId];
+        if (!node?.linkId) return;
+        const target = state.nodes[node.linkId];
         if (target) {
           node.content = target.content;
-          node.mentions = [...target.mentions];
+          node.mentions = [...(target.mentions ?? [])];
           node.statusType = target.statusType;
           node.projectStatus = target.projectStatus;
           node.checked = target.checked;
         }
-        node.linkedNodeId = null;
+        node.linkId = null;
         node.updatedAt = Date.now();
       });
     },
@@ -354,7 +361,7 @@ export const useStore = create<StoreState>()(
     activeNodeId: null,
     focusCursorAtEnd: false,
     sidebarCollapsed: false,
-    activeView: 'project',
+    activeView: "project",
     activeProjectId: null,
     projectColumns: 2,
     dailyColumns: 2,
@@ -375,7 +382,7 @@ export const useStore = create<StoreState>()(
       });
     },
 
-    setActiveView(view: 'project' | 'workbench') {
+    setActiveView(view: "project" | "workbench") {
       set((state) => {
         state.activeView = view;
       });
@@ -384,7 +391,7 @@ export const useStore = create<StoreState>()(
     setActiveProject(id: string | null) {
       set((state) => {
         state.activeProjectId = id;
-        state.activeView = 'project';
+        state.activeView = "project";
       });
     },
 
@@ -436,7 +443,7 @@ export const useStore = create<StoreState>()(
       });
       lastTextSnapshotAt = 0;
     },
-  }))
+  })),
 );
 
 // Convenience selectors

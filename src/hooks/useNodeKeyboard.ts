@@ -1,6 +1,6 @@
-import { useCallback } from 'react';
-import { useStore } from '../store';
-import { flattenVisible } from '../lib/tree';
+import { useCallback } from "react";
+import { flattenVisible } from "../lib/tree";
+import { useStore } from "../store";
 
 interface UseNodeKeyboardOptions {
   nodeId: string;
@@ -8,7 +8,11 @@ interface UseNodeKeyboardOptions {
   isProjectTitle?: boolean;
 }
 
-export function useNodeKeyboard({ nodeId, divRef, isProjectTitle = false }: UseNodeKeyboardOptions) {
+export function useNodeKeyboard({
+  nodeId,
+  divRef,
+  isProjectTitle = false,
+}: UseNodeKeyboardOptions) {
   const store = useStore();
 
   const handleKeyDown = useCallback(
@@ -17,7 +21,7 @@ export function useNodeKeyboard({ nodeId, divRef, isProjectTitle = false }: UseN
       const node = nodes[nodeId];
       if (!node) return;
 
-      if (e.key === 'Enter' && !e.shiftKey) {
+      if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
         if (isProjectTitle) {
           // Focus first child, or create one if none exists
@@ -30,7 +34,7 @@ export function useNodeKeyboard({ nodeId, divRef, isProjectTitle = false }: UseN
         } else {
           const newId = store.createNode(node.parentId, nodeId);
           // New sibling inherits the status type (but not the value)
-          if (node.statusType !== 'none') {
+          if (node.statusType !== "none") {
             store.setStatusType(newId, node.statusType);
           }
           store.setActiveNode(newId, false);
@@ -38,12 +42,12 @@ export function useNodeKeyboard({ nodeId, divRef, isProjectTitle = false }: UseN
         return;
       }
 
-      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+      if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
         const { statusType } = node;
-        if (statusType === 'checkable') {
+        if (statusType === "checkable") {
           store.toggleChecked(nodeId);
-        } else if (statusType === 'project') {
+        } else if (statusType === "project") {
           store.cycleProjectStatus(nodeId);
         } else {
           // Default: make it a checkable and check it
@@ -52,14 +56,14 @@ export function useNodeKeyboard({ nodeId, divRef, isProjectTitle = false }: UseN
         return;
       }
 
-      if (e.key === 'Tab' && !e.shiftKey) {
+      if (e.key === "Tab" && !e.shiftKey) {
         e.preventDefault();
         store.indentNode(nodeId);
         store.setActiveNode(nodeId, true);
         return;
       }
 
-      if (e.key === 'Tab' && e.shiftKey) {
+      if (e.key === "Tab" && e.shiftKey) {
         e.preventDefault();
         // Don't outdent if already a direct child of a root project node
         const parent = node.parentId ? nodes[node.parentId] : null;
@@ -69,13 +73,12 @@ export function useNodeKeyboard({ nodeId, divRef, isProjectTitle = false }: UseN
         return;
       }
 
-      if (e.key === 'Backspace') {
+      if (e.key === "Backspace") {
         const div = divRef.current;
         if (!div) return;
         const sel = window.getSelection();
-        const isEmpty = div.textContent === '';
-        const atStart =
-          sel?.anchorOffset === 0 && sel?.focusOffset === 0;
+        const isEmpty = div.textContent === "";
+        const atStart = sel?.anchorOffset === 0 && sel?.focusOffset === 0;
 
         if (isEmpty || atStart) {
           e.preventDefault();
@@ -85,14 +88,14 @@ export function useNodeKeyboard({ nodeId, divRef, isProjectTitle = false }: UseN
           if (idx > 0) {
             store.setActiveNode(flat[idx - 1].id, true);
           }
-          if (isEmpty) {
+          if (isEmpty && store.nodes[nodeId].childrenIds.length === 0) {
             store.deleteNode(nodeId);
           }
           return;
         }
       }
 
-      if (e.key === 'ArrowUp') {
+      if (e.key === "ArrowUp") {
         const div = divRef.current;
         if (!div) return;
         const sel = window.getSelection();
@@ -114,7 +117,7 @@ export function useNodeKeyboard({ nodeId, divRef, isProjectTitle = false }: UseN
         return;
       }
 
-      if (e.key === 'ArrowDown') {
+      if (e.key === "ArrowDown") {
         const div = divRef.current;
         if (!div) return;
         const sel = window.getSelection();
@@ -135,7 +138,7 @@ export function useNodeKeyboard({ nodeId, divRef, isProjectTitle = false }: UseN
         return;
       }
     },
-    [nodeId, store, divRef]
+    [nodeId, store, divRef],
   );
 
   return { handleKeyDown };

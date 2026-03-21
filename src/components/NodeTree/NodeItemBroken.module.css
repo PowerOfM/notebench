@@ -1,0 +1,42 @@
+.brokenRow {
+  opacity: 0.7;
+}
+
+.brokenText {
+  flex: 1;
+  padding: var(--node-padding-y) 4px;
+  font-style: italic;
+  color: var(--color-status-archived, #ef4444);
+  font-size: var(--font-size-sm);
+}
+
+.brokenActions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  padding: var(--node-padding-y) 4px;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.brokenRow:hover .brokenActions {
+  opacity: 1;
+}
+
+.brokenBtn {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 1px 6px;
+  cursor: pointer;
+  background: var(--color-bg-secondary);
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast);
+}
+
+.brokenBtn:hover {
+  background: var(--color-bg-active);
+  color: var(--color-text);
+}

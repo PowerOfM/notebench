@@ -16,6 +16,7 @@
   border-bottom: 1px solid var(--color-border);
   padding-bottom: 8px;
   margin-bottom: 4px;
+  height: 45px;
 }
 
 .viewBtn {
@@ -25,7 +26,9 @@
   font-size: var(--font-size-sm);
   color: var(--color-text-muted);
   text-align: center;
-  transition: color var(--transition-fast), background var(--transition-fast);
+  transition:
+    color var(--transition-fast),
+    background var(--transition-fast);
 }
 
 .viewBtn:hover {
@@ -53,7 +56,9 @@
   border-radius: var(--radius-sm);
   font-size: var(--font-size-base);
   color: var(--color-text-muted);
-  transition: color var(--transition-fast), background var(--transition-fast);
+  transition:
+    color var(--transition-fast),
+    background var(--transition-fast);
 }
 
 .todayBtn:hover {
@@ -88,7 +93,9 @@
   border-radius: var(--radius-sm);
   color: var(--color-text-muted);
   font-size: 16px;
-  transition: color var(--transition-fast), background var(--transition-fast);
+  transition:
+    color var(--transition-fast),
+    background var(--transition-fast);
 }
 
 .settingsBtn:hover {
@@ -121,7 +128,9 @@
   color: var(--color-text-muted);
   font-size: 18px;
   line-height: 1;
-  transition: color var(--transition-fast), background var(--transition-fast);
+  transition:
+    color var(--transition-fast),
+    background var(--transition-fast);
 }
 
 .addBtn:hover {
@@ -142,7 +151,9 @@
   border-radius: var(--radius-sm);
   cursor: pointer;
   color: var(--color-text-muted);
-  transition: color var(--transition-fast), background var(--transition-fast);
+  transition:
+    color var(--transition-fast),
+    background var(--transition-fast);
   font-size: var(--font-size-base);
   white-space: nowrap;
   overflow: hidden;

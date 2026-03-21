@@ -1,12 +1,13 @@
-import { useCallback } from 'react';
-import { useStore } from '../../store';
-import { Sidebar } from './Sidebar';
-import { NodeTree } from '../NodeTree/NodeTree';
-import { NodeContent } from '../NodeContent/NodeContent';
-import { WorkbenchView } from '../Workbench/WorkbenchView';
-import { SettingsPanel } from '../Settings/SettingsPanel';
-import { FloatingToolbar } from '../FloatingToolbar/FloatingToolbar';
-import styles from './Layout.module.css';
+import clsx from "clsx";
+import { Menu } from "lucide-react";
+import { useCallback } from "react";
+import { useStore } from "../../store";
+import { FloatingToolbar } from "../FloatingToolbar/FloatingToolbar";
+import { ProjectsView } from "../ProjectsView/ProjectsView";
+import { SettingsPanel } from "../Settings/SettingsPanel";
+import { WorkbenchView } from "../Workbench/WorkbenchView";
+import styles from "./Layout.module.css";
+import { Sidebar } from "./Sidebar";
 
 export function Layout() {
   const activeProjectId = useStore((s) => s.activeProjectId);
@@ -27,14 +28,10 @@ export function Layout() {
     setActiveNode(id, false);
   }, [createNode, setActiveProject, setActiveNode]);
 
-  const handleAddFirstNode = useCallback(() => {
-    if (!activeProjectId) return;
-    const id = createNode(activeProjectId);
-    setActiveNode(id, false);
-  }, [activeProjectId, createNode, setActiveNode]);
-
   return (
-    <div className={`${styles.layout}${sidebarCollapsed ? ` ${styles.sidebarCollapsed}` : ''}`}>
+    <div
+      className={`${styles.layout}${sidebarCollapsed ? ` ${styles.sidebarCollapsed}` : ""}`}
+    >
       {/* Mobile backdrop — closes sidebar when tapping outside */}
       {!sidebarCollapsed && (
         <div
@@ -44,7 +41,12 @@ export function Layout() {
         />
       )}
 
-      <div className={`${styles.sidebarWrapper}${sidebarCollapsed ? ` ${styles.sidebarHidden}` : ''}`}>
+      <div
+        className={clsx(
+          styles.sidebarWrapper,
+          sidebarCollapsed && styles.sidebarHidden,
+        )}
+      >
         <Sidebar />
       </div>
 
@@ -53,13 +55,13 @@ export function Layout() {
         <button
           className={styles.menuToggle}
           onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-          aria-label={sidebarCollapsed ? 'Open sidebar' : 'Close sidebar'}
+          aria-label={sidebarCollapsed ? "Open sidebar" : "Close sidebar"}
           aria-expanded={!sidebarCollapsed}
         >
-          ☰
+          <Menu size={12} />
         </button>
 
-        {activeView === 'workbench' ? (
+        {activeView === "workbench" ? (
           <WorkbenchView />
         ) : !activeProject ? (
           <div className={styles.emptyState}>
@@ -70,34 +72,7 @@ export function Layout() {
             </button>
           </div>
         ) : (
-          <div className={styles.projectView}>
-            <div className={styles.projectHeader}>
-              <NodeContent nodeId={activeProjectId!} isProjectTitle placeholder="Project name..." />
-              {activeProject.isDaily && (
-                <p className={styles.dailyHint}>
-                  Use <kbd>@</kbd> to reference and link project nodes inline.
-                </p>
-              )}
-            </div>
-            <div className={styles.content}>
-              {activeProject.childrenIds.length === 0 ? (
-                <div
-                  className={styles.emptyState}
-                  style={{ height: 'auto', paddingTop: 32 }}
-                >
-                  <p>{activeProject.isDaily ? 'No entries yet' : 'No nodes yet'}</p>
-                  <button
-                    className={styles.emptyStateBtn}
-                    onClick={handleAddFirstNode}
-                  >
-                    + Add note
-                  </button>
-                </div>
-              ) : (
-                <NodeTree rootIds={activeProject.childrenIds} />
-              )}
-            </div>
-          </div>
+          <ProjectsView />
         )}
 
         <FloatingToolbar />

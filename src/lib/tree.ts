@@ -1,5 +1,5 @@
-import type { NodeData, NodeMap } from '../types/node';
-import { resolveLink } from './linkResolver';
+import type { NodeData, NodeMap } from "../types/node";
+import { resolveLink } from "./linkResolver";
 
 export interface FlatNode {
   id: string;
@@ -27,7 +27,7 @@ export function getProjection(
   activeId: string,
   overId: string,
   dragOffsetX: number,
-  indentSize: number
+  indentSize: number,
 ): DragProjection | null {
   const activeIndex = items.findIndex((i) => i.id === activeId);
   const overIndex = items.findIndex((i) => i.id === overId);
@@ -81,7 +81,7 @@ export function getProjection(
 export function flattenVisible(
   ids: string[],
   nodes: NodeMap,
-  depth = 0
+  depth = 0,
 ): FlatNode[] {
   const result: FlatNode[] = [];
   for (const id of ids) {
@@ -89,8 +89,8 @@ export function flattenVisible(
     if (!node) continue;
     result.push({ id, depth });
     // Link nodes use their own collapsed state but show the target's children
-    const effectiveChildren = node.linkedNodeId
-      ? (resolveLink(node.linkedNodeId, nodes)?.childrenIds ?? [])
+    const effectiveChildren = node.linkId
+      ? (resolveLink(node.linkId, nodes)?.childrenIds ?? [])
       : node.childrenIds;
     if (!node.collapsed && effectiveChildren.length > 0) {
       result.push(...flattenVisible(effectiveChildren, nodes, depth + 1));
@@ -105,7 +105,7 @@ export function flattenVisible(
 export function getSiblings(
   node: NodeData,
   nodes: NodeMap,
-  rootIds: string[]
+  rootIds: string[],
 ): string[] {
   if (node.parentId === null) return rootIds;
   const parent = nodes[node.parentId];

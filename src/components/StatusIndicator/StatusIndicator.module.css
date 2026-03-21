@@ -7,8 +7,6 @@
   flex-shrink: 0;
   cursor: pointer;
   border-radius: var(--radius-sm);
-  margin-top: calc(var(--node-padding-y) + 2px);
-  margin-right: 4px;
   transition: opacity var(--transition-fast);
   user-select: none;
 }
@@ -26,7 +24,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background var(--transition-fast), border-color var(--transition-fast);
+  transition:
+    background var(--transition-fast),
+    border-color var(--transition-fast);
 }
 
 .checkbox.checked {
@@ -62,7 +62,8 @@
 .badge.inProgress {
   background: color-mix(in srgb, var(--color-in-progress) 20%, transparent);
   color: var(--color-in-progress);
-  border: 1px solid color-mix(in srgb, var(--color-in-progress) 40%, transparent);
+  border: 1px solid
+    color-mix(in srgb, var(--color-in-progress) 40%, transparent);
 }
 
 .badge.done {
@@ -79,13 +80,8 @@
 
 /* None — show faint circle on hover */
 .noneHint {
-  width: 13px;
-  height: 13px;
-  border: 1.5px dashed transparent;
-  border-radius: 3px;
-  transition: border-color var(--transition-fast);
-}
-
-.indicator:hover .noneHint {
-  border-color: var(--color-text-faint);
+  width: 8px;
+  height: 8px;
+  background: var(--color-text-faint);
+  border-radius: 50%;
 }

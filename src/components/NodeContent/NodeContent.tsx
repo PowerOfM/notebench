@@ -1,17 +1,19 @@
-import { useEffect, useRef, useCallback, useState } from 'react';
-import { useStore } from '../../store';
-import { useNodeKeyboard } from '../../hooks/useNodeKeyboard';
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useNodeKeyboard } from "../../hooks/useNodeKeyboard";
 import {
-  serializeFromDOM,
-  renderToDOM,
   createMentionSpan,
-  getMentionQueryAtCursor,
   getLinkQueryAtCursor,
-} from '../../lib/contentParser';
-import { MentionPopup, type MentionPopupHandle } from '../MentionPopup/MentionPopup';
-import { LinkPopup, type LinkPopupHandle } from '../LinkPopup/LinkPopup';
-import type { NodeData } from '../../types/node';
-import styles from './NodeContent.module.css';
+  getMentionQueryAtCursor,
+  renderToDOM,
+  serializeFromDOM,
+} from "../../lib/contentParser";
+import { useStore } from "../../store";
+import type { NodeData } from "../../types/node";
+import {
+  MentionPopup,
+  type MentionPopupHandle,
+} from "../MentionPopup/MentionPopup";
+import styles from "./NodeContent.module.css";
 
 interface NodeContentProps {
   nodeId: string;
@@ -26,17 +28,17 @@ export function NodeContent({
   nodeId,
   effectiveNodeId,
   isProjectTitle,
-  placeholder = 'Type something...',
+  placeholder = "Type something...",
   strikethrough,
 }: NodeContentProps) {
   const divRef = useRef<HTMLDivElement>(null);
   const mentionPopupRef = useRef<MentionPopupHandle>(null);
-  const linkPopupRef = useRef<LinkPopupHandle>(null);
+  const linkPopupRef = useRef<MentionPopupHandle>(null);
 
   // Content ops target the effective node; focus/active uses the structural nodeId
   const contentNodeId = effectiveNodeId ?? nodeId;
 
-  const content = useStore((s) => s.nodes[contentNodeId]?.content ?? '');
+  const content = useStore((s) => s.nodes[contentNodeId]?.content ?? "");
   const nodes = useStore((s) => s.nodes);
   const activeNodeId = useStore((s) => s.activeNodeId);
   const focusCursorAtEnd = useStore((s) => s.focusCursorAtEnd);
@@ -45,7 +47,11 @@ export function NodeContent({
   const setActiveProject = useStore((s) => s.setActiveProject);
   const createLinkNode = useStore((s) => s.createLinkNode);
 
-  const { handleKeyDown: handleNodeKeyDown } = useNodeKeyboard({ nodeId, divRef, isProjectTitle });
+  const { handleKeyDown: handleNodeKeyDown } = useNodeKeyboard({
+    nodeId,
+    divRef,
+    isProjectTitle,
+  });
 
   const isActive = activeNodeId === nodeId;
   // Null sentinel ensures the first render always syncs the DOM,
@@ -53,8 +59,14 @@ export function NodeContent({
   const prevNodeIdRef = useRef<string | null>(null);
 
   // Popup states
-  const [mentionState, setMentionState] = useState<{ query: string; anchorRect: DOMRect } | null>(null);
-  const [linkState, setLinkState] = useState<{ query: string; anchorRect: DOMRect } | null>(null);
+  const [mentionState, setMentionState] = useState<{
+    query: string;
+    anchorRect: DOMRect;
+  } | null>(null);
+  const [linkState, setLinkState] = useState<{
+    query: string;
+    anchorRect: DOMRect;
+  } | null>(null);
 
   // ── Navigate to the node's owning project and focus it ──────────────────────
   const handleMentionClick = useCallback(
@@ -69,7 +81,7 @@ export function NodeContent({
       setActiveProject(root.id);
       setActiveNode(mentionedNodeId, false);
     },
-    [setActiveProject, setActiveNode]
+    [setActiveProject, setActiveNode],
   );
 
   // ── DOM ↔ store sync ─────────────────────────────────────────────────────────
@@ -113,8 +125,14 @@ export function NodeContent({
     const linkQuery = getLinkQueryAtCursor(div);
     if (linkQuery !== null) {
       const sel = window.getSelection();
-      const rect = sel?.rangeCount ? sel.getRangeAt(0).getBoundingClientRect() : new DOMRect();
-      setLinkState((prev) => (prev ? { ...prev, query: linkQuery } : { query: linkQuery, anchorRect: rect }));
+      const rect = sel?.rangeCount
+        ? sel.getRangeAt(0).getBoundingClientRect()
+        : new DOMRect();
+      setLinkState((prev) =>
+        prev
+          ? { ...prev, query: linkQuery }
+          : { query: linkQuery, anchorRect: rect },
+      );
       setMentionState(null);
       return;
     }
@@ -123,9 +141,13 @@ export function NodeContent({
     const mentionQuery = getMentionQueryAtCursor(div);
     if (mentionQuery !== null) {
       const sel = window.getSelection();
-      const rect = sel?.rangeCount ? sel.getRangeAt(0).getBoundingClientRect() : new DOMRect();
+      const rect = sel?.rangeCount
+        ? sel.getRangeAt(0).getBoundingClientRect()
+        : new DOMRect();
       setMentionState((prev) =>
-        prev ? { ...prev, query: mentionQuery } : { query: mentionQuery, anchorRect: rect }
+        prev
+          ? { ...prev, query: mentionQuery }
+          : { query: mentionQuery, anchorRect: rect },
       );
     } else {
       setMentionState(null);
@@ -147,10 +169,14 @@ export function NodeContent({
       range.setStart(range.startContainer, range.startOffset - deleteCount);
       range.deleteContents();
 
-      const span = createMentionSpan(selectedNode.id, selectedNode.content, handleMentionClick);
+      const span = createMentionSpan(
+        selectedNode.id,
+        selectedNode.content,
+        handleMentionClick,
+      );
       range.insertNode(span);
 
-      const space = document.createTextNode('\u00a0');
+      const space = document.createTextNode("\u00a0");
       if (span.nextSibling) {
         div.insertBefore(space, span.nextSibling);
       } else {
@@ -167,7 +193,7 @@ export function NodeContent({
       updateContent(contentNodeId, newContent, mentions);
       setMentionState(null);
     },
-    [mentionState, contentNodeId, updateContent, handleMentionClick]
+    [mentionState, contentNodeId, updateContent, handleMentionClick],
   );
 
   // ── Link node creation ───────────────────────────────────────────────────────
@@ -195,22 +221,41 @@ export function NodeContent({
       setActiveNode(newLinkId, false);
       setLinkState(null);
     },
-    [linkState, contentNodeId, nodeId, updateContent, createLinkNode, setActiveNode]
+    [
+      linkState,
+      contentNodeId,
+      nodeId,
+      updateContent,
+      createLinkNode,
+      setActiveNode,
+    ],
   );
 
   // ── Keyboard: intercept popup nav before node shortcuts ─────────────────────
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLDivElement>) => {
-      const activePopup = mentionState ? mentionPopupRef : linkState ? linkPopupRef : null;
+      const activePopup = mentionState
+        ? mentionPopupRef
+        : linkState
+          ? linkPopupRef
+          : null;
       if (activePopup) {
-        if (e.key === 'ArrowDown') { e.preventDefault(); activePopup.current?.moveDown(); return; }
-        if (e.key === 'ArrowUp') { e.preventDefault(); activePopup.current?.moveUp(); return; }
-        if (e.key === 'Enter') {
+        if (e.key === "ArrowDown") {
+          e.preventDefault();
+          activePopup.current?.moveDown();
+          return;
+        }
+        if (e.key === "ArrowUp") {
+          e.preventDefault();
+          activePopup.current?.moveUp();
+          return;
+        }
+        if (e.key === "Enter") {
           e.preventDefault();
           activePopup.current?.selectCurrent();
           return;
         }
-        if (e.key === 'Escape') {
+        if (e.key === "Escape") {
           e.preventDefault();
           setMentionState(null);
           setLinkState(null);
@@ -219,7 +264,7 @@ export function NodeContent({
       }
       handleNodeKeyDown(e);
     },
-    [mentionState, linkState, handleNodeKeyDown]
+    [mentionState, linkState, handleNodeKeyDown],
   );
 
   const handleFocus = useCallback(() => {
@@ -230,7 +275,7 @@ export function NodeContent({
     <>
       <div
         ref={divRef}
-        className={`${styles.editor}${strikethrough ? ` ${styles.strikethrough}` : ''}`}
+        className={`${styles.editor}${strikethrough ? ` ${styles.strikethrough}` : ""}`}
         contentEditable
         suppressContentEditableWarning
         data-node-id={nodeId}
@@ -250,7 +295,7 @@ export function NodeContent({
         />
       )}
       {linkState && (
-        <LinkPopup
+        <MentionPopup
           ref={linkPopupRef}
           query={linkState.query}
           anchorRect={linkState.anchorRect}

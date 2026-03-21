@@ -1,4 +1,4 @@
-import type { NodeData, NodeMap } from '../types/node';
+import type { NodeData, NodeMap } from "../types/node";
 
 const MAX_DEPTH = 10;
 
@@ -12,8 +12,8 @@ export function resolveLink(nodeId: string, nodes: NodeMap): NodeData | null {
   let current = nodes[nodeId];
   let depth = 0;
 
-  while (current?.linkedNodeId && depth < MAX_DEPTH) {
-    const next = nodes[current.linkedNodeId];
+  while (current?.linkId && depth < MAX_DEPTH) {
+    const next = nodes[current.linkId];
     if (!next) return null; // broken — target deleted
     current = next;
     depth++;

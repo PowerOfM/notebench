@@ -1,0 +1,10 @@
+.menuItem {
+  cursor: default;
+  padding: 0 8px;
+  font-size: var(--font-size-sm);
+}
+
+.menuItem:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text);
+}

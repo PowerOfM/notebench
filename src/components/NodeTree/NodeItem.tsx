@@ -1,25 +1,31 @@
-import { memo, useCallback } from 'react';
-import { useSortable } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
-import { useStore } from '../../store';
-import { resolveLink } from '../../lib/linkResolver';
-import { NodeContent } from '../NodeContent/NodeContent';
-import { StatusIndicator } from '../StatusIndicator/StatusIndicator';
-import styles from './NodeItem.module.css';
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import clsx from "clsx";
+import { ChevronRight, GripVertical } from "lucide-react";
+import { memo, useCallback } from "react";
+import { resolveLink } from "../../lib/linkResolver";
+import { useStore } from "../../store";
+import { NodeContent } from "../NodeContent/NodeContent";
+import { StatusIndicator } from "../StatusIndicator/StatusIndicator";
+import styles from "./NodeItem.module.css";
+import { NodeItemMenu } from "./NodeItemMenu";
 
 interface NodeItemProps {
   nodeId: string;
   depth: number;
 }
 
-export const NodeItem = memo(function NodeItem({ nodeId, depth }: NodeItemProps) {
+export const NodeItem = memo(function NodeItem({
+  nodeId,
+  depth,
+}: NodeItemProps) {
   // Subscribe only to the specific node — not the full nodes map
   const node = useStore((s) => s.nodes[nodeId]);
 
   // If this is a link node, also subscribe to its direct target so we
   // re-render when the target's content/status changes
-  const linkedTargetId = node?.linkedNodeId ?? null;
-  useStore((s) => (linkedTargetId ? s.nodes[linkedTargetId] : null));
+  const isLink = !!node.linkId;
+  useStore((s) => (node.linkId ? s.nodes[node.linkId] : null));
 
   const toggleCollapsed = useStore((s) => s.toggleCollapsed);
   const unlinkNode = useStore((s) => s.unlinkNode);
@@ -40,7 +46,7 @@ export const NodeItem = memo(function NodeItem({ nodeId, depth }: NodeItemProps)
       e.stopPropagation();
       toggleCollapsed(nodeId);
     },
-    [nodeId, toggleCollapsed]
+    [nodeId, toggleCollapsed],
   );
 
   const handleUnlink = useCallback(
@@ -49,7 +55,7 @@ export const NodeItem = memo(function NodeItem({ nodeId, depth }: NodeItemProps)
       e.stopPropagation();
       unlinkNode(nodeId);
     },
-    [nodeId, unlinkNode]
+    [nodeId, unlinkNode],
   );
 
   const handleDelete = useCallback(
@@ -58,48 +64,22 @@ export const NodeItem = memo(function NodeItem({ nodeId, depth }: NodeItemProps)
       e.stopPropagation();
       deleteNode(nodeId);
     },
-    [nodeId, deleteNode]
+    [nodeId, deleteNode],
   );
 
-  if (!node) return null;
-
-  const isLink = !!node.linkedNodeId;
   // Use getState() for resolveLink — reads current state without subscribing to
   // the full nodes map (avoids re-rendering all NodeItems on any node change)
-  const effectiveNode = isLink ? resolveLink(nodeId, useStore.getState().nodes) : node;
-  const isBroken = isLink && !effectiveNode;
+  const effectiveNode = isLink
+    ? resolveLink(nodeId, useStore.getState().nodes)
+    : node;
   const cssVars = {
-    '--depth': depth,
+    "--depth": depth,
     transform: CSS.Transform.toString(transform),
     transition,
   } as React.CSSProperties;
 
-  // ── Broken link ──────────────────────────────────────────────────────────────
-  if (isBroken) {
-    return (
-      <div
-        ref={setNodeRef}
-        role="treeitem"
-        aria-level={depth + 1}
-        className={`${styles.row} ${styles.brokenRow}`}
-        style={cssVars}
-        {...attributes}
-      >
-        <div className={styles.dragHandle} {...listeners} aria-label="Drag to reorder" />
-        <div className={styles.gutter}>
-          <span className={styles.linkIcon} aria-hidden="true">⛓</span>
-        </div>
-        <span className={styles.brokenText}>Broken link</span>
-        <div className={styles.brokenActions}>
-          <button className={styles.brokenBtn} onMouseDown={handleUnlink} aria-label="Unlink broken node">
-            Unlink
-          </button>
-          <button className={styles.brokenBtn} onMouseDown={handleDelete} aria-label="Delete broken node">
-            Delete
-          </button>
-        </div>
-      </div>
-    );
+  if (!node) {
+    return null;
   }
 
   const effectiveId = effectiveNode!.id;
@@ -111,31 +91,44 @@ export const NodeItem = memo(function NodeItem({ nodeId, depth }: NodeItemProps)
       role="treeitem"
       aria-level={depth + 1}
       aria-expanded={hasChildren ? !node.collapsed : undefined}
-      className={`${styles.row}${isLink ? ` ${styles.linkedRow}` : ''}${isDragging ? ` ${styles.dragging}` : ''}`}
+      className={clsx(
+        styles.row,
+        isLink && styles.linkedRow,
+        isDragging && styles.dragging,
+      )}
       style={cssVars}
       {...attributes}
     >
-      <div className={styles.dragHandle} {...listeners} aria-label="Drag to reorder" />
-      <div className={styles.gutter}>
-        {hasChildren ? (
-          <button
-            className={`${styles.collapseBtn} ${!node.collapsed ? styles.expanded : ''} ${styles.visible}`}
-            onClick={handleCollapseClick}
-            onPointerDown={(e) => e.stopPropagation()}
-            tabIndex={-1}
-            aria-label={node.collapsed ? 'Expand' : 'Collapse'}
-          >
-            ▶
-          </button>
-        ) : (
-          <span
-            className={isLink ? styles.linkIcon : styles.bullet}
-            aria-hidden="true"
-          />
-        )}
+      <div
+        className={styles.dragHandle}
+        {...listeners}
+        aria-label="Drag to reorder"
+      >
+        <GripVertical size={16} color="var(--color-text-faint)" />
       </div>
+      {hasChildren ? (
+        <button
+          className={clsx(
+            styles.collapseBtn,
+            !node.collapsed && styles.expanded,
+            styles.visible,
+          )}
+          onClick={handleCollapseClick}
+          onPointerDown={(e) => e.stopPropagation()}
+          tabIndex={-1}
+          aria-label={node.collapsed ? "Expand" : "Collapse"}
+        >
+          <ChevronRight size={16} color="var(--color-text-faint)" />
+        </button>
+      ) : (
+        <div className={styles.collapseBtnPlaceholder} />
+      )}
       {isLink && hasChildren && (
-        <span className={styles.linkIconInline} aria-label="Linked node" title="Linked node">
+        <span
+          className={styles.linkIconInline}
+          aria-label="Linked node"
+          title="Linked node"
+        >
           ⛓
         </span>
       )}
@@ -144,9 +137,10 @@ export const NodeItem = memo(function NodeItem({ nodeId, depth }: NodeItemProps)
         nodeId={nodeId}
         effectiveNodeId={isLink ? effectiveId : undefined}
         strikethrough={
-          effectiveNode!.statusType === 'checkable' && effectiveNode!.checked
+          effectiveNode!.statusType === "checkable" && effectiveNode!.checked
         }
       />
+      <NodeItemMenu onDelete={handleDelete} />
     </div>
   );
 });
