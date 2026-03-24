@@ -1,4 +1,4 @@
-import type { NodeData, NodeMap } from "../types/node";
+import type { INode, INodeMap } from "../types/node";
 
 const MAX_DEPTH = 10;
 
@@ -8,7 +8,7 @@ const MAX_DEPTH = 10;
  *
  * Stops at depth 10 to prevent infinite loops from circular references.
  */
-export function resolveLink(nodeId: string, nodes: NodeMap): NodeData | null {
+export function resolveLink(nodeId: string, nodes: INodeMap): INode | null {
   let current = nodes[nodeId];
   let depth = 0;
 

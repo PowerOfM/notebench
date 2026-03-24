@@ -28,10 +28,10 @@ import styles from "./NodeTree.module.css";
 const INDENT_SIZE = 24;
 
 interface NodeTreeProps {
-  rootIds: string[];
+  rootId: string[];
 }
 
-export function NodeTree({ rootIds }: NodeTreeProps) {
+export function NodeTree({ rootId }: NodeTreeProps) {
   const nodes = useStore((s) => s.nodes);
   const moveNode = useStore((s) => s.moveNode);
 

@@ -1,4 +1,4 @@
-import type { MentionRef, NodeMap } from '../types/node';
+import type { IMention, INodeMap } from "../types/node";
 
 const MENTION_RE = /@\{([^}]+)\}/g;
 
@@ -7,18 +7,25 @@ const MENTION_RE = /@\{([^}]+)\}/g;
  * - `content`: plain text with `@{nodeId}` markers for mention spans
  * - `mentions`: parsed MentionRef positions
  */
-export function serializeFromDOM(div: HTMLDivElement): { content: string; mentions: MentionRef[] } {
-  let content = '';
-  const mentions: MentionRef[] = [];
+export function serializeFromDOM(div: HTMLDivElement): {
+  content: string;
+  mentions: IMention[];
+} {
+  let content = "";
+  const mentions: IMention[] = [];
 
   function walk(node: ChildNode) {
     if (node.nodeType === Node.TEXT_NODE) {
-      content += node.textContent ?? '';
+      content += node.textContent ?? "";
     } else if (node instanceof HTMLElement) {
       const mentionId = node.dataset.mentionId;
       if (mentionId) {
         const marker = `@{${mentionId}}`;
-        mentions.push({ nodeId: mentionId, offset: content.length, length: marker.length });
+        mentions.push({
+          nodeId: mentionId,
+          offset: content.length,
+          length: marker.length,
+        });
         content += marker;
       } else {
         for (const child of Array.from(node.childNodes)) {
@@ -42,12 +49,12 @@ export function serializeFromDOM(div: HTMLDivElement): { content: string; mentio
 export function renderToDOM(
   div: HTMLDivElement,
   content: string,
-  nodes: NodeMap,
-  onMentionClick: (id: string) => void
+  nodes: INodeMap,
+  onMentionClick: (id: string) => void,
 ): void {
-  div.innerHTML = '';
+  div.innerHTML = "";
 
-  const regex = new RegExp(MENTION_RE.source, 'g');
+  const regex = new RegExp(MENTION_RE.source, "g");
   let lastIndex = 0;
   let match: RegExpExecArray | null;
 
@@ -56,7 +63,9 @@ export function renderToDOM(
     if (before) div.appendChild(document.createTextNode(before));
 
     const id = match[1];
-    div.appendChild(createMentionSpan(id, nodes[id]?.content ?? null, onMentionClick));
+    div.appendChild(
+      createMentionSpan(id, nodes[id]?.content ?? null, onMentionClick),
+    );
 
     lastIndex = match.index + match[0].length;
   }
@@ -68,14 +77,14 @@ export function renderToDOM(
 export function createMentionSpan(
   id: string,
   nodeContent: string | null,
-  onClick: (id: string) => void
+  onClick: (id: string) => void,
 ): HTMLSpanElement {
-  const span = document.createElement('span');
-  span.contentEditable = 'false';
+  const span = document.createElement("span");
+  span.contentEditable = "false";
   span.dataset.mentionId = id;
-  span.className = 'mention-chip';
-  span.textContent = `@${nodeContent || 'Untitled'}`;
-  span.addEventListener('click', (e) => {
+  span.className = "mention-chip";
+  span.textContent = `@${nodeContent || "Untitled"}`;
+  span.addEventListener("click", (e) => {
     e.preventDefault();
     e.stopPropagation();
     onClick(id);
@@ -94,8 +103,8 @@ export function getLinkQueryAtCursor(div: HTMLDivElement): string | null {
   if (!anchorNode || anchorNode.nodeType !== Node.TEXT_NODE) return null;
   if (!div.contains(anchorNode)) return null;
 
-  const textBefore = (anchorNode.textContent ?? '').slice(0, anchorOffset);
-  const bracketIdx = textBefore.lastIndexOf('[[');
+  const textBefore = (anchorNode.textContent ?? "").slice(0, anchorOffset);
+  const bracketIdx = textBefore.lastIndexOf("[[");
   if (bracketIdx === -1) return null;
 
   const afterBrackets = textBefore.slice(bracketIdx + 2);
@@ -116,8 +125,8 @@ export function getMentionQueryAtCursor(div: HTMLDivElement): string | null {
   if (!anchorNode || anchorNode.nodeType !== Node.TEXT_NODE) return null;
   if (!div.contains(anchorNode)) return null;
 
-  const textBefore = (anchorNode.textContent ?? '').slice(0, anchorOffset);
-  const atIdx = textBefore.lastIndexOf('@');
+  const textBefore = (anchorNode.textContent ?? "").slice(0, anchorOffset);
+  const atIdx = textBefore.lastIndexOf("@");
   if (atIdx === -1) return null;
 
   const afterAt = textBefore.slice(atIdx + 1);

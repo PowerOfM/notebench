@@ -1,25 +1,19 @@
+import clsx from "clsx";
+import { useAtom, useAtomValue } from "jotai";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNodeKeyboard } from "../../hooks/useNodeKeyboard";
-import {
-  createMentionSpan,
-  getLinkQueryAtCursor,
-  getMentionQueryAtCursor,
-  renderToDOM,
-  serializeFromDOM,
-} from "../../lib/contentParser";
-import { useStore } from "../../store";
-import type { NodeData } from "../../types/node";
-import {
-  MentionPopup,
-  type MentionPopupHandle,
-} from "../MentionPopup/MentionPopup";
+import { renderToDOM, serializeFromDOM } from "../../lib/contentParser";
+import { findRoot } from "../../lib/tree";
+import { activeNodeIdAtom, nodesAtom } from "../../store/atoms";
+import type { IMention } from "../../types/node";
+import { type MentionPopupHandle } from "../MentionPopup/MentionPopup";
 import styles from "./NodeContent.module.css";
 
 interface NodeContentProps {
   nodeId: string;
   /** When set (linked node), content r/w goes to this ID instead of nodeId. */
   effectiveNodeId?: string;
-  isProjectTitle?: boolean;
+  isRootTitle?: boolean;
   placeholder?: string;
   strikethrough?: boolean;
 }
@@ -27,30 +21,40 @@ interface NodeContentProps {
 export function NodeContent({
   nodeId,
   effectiveNodeId,
-  isProjectTitle,
+  isRootTitle,
   placeholder = "Type something...",
   strikethrough,
 }: NodeContentProps) {
   const divRef = useRef<HTMLDivElement>(null);
   const mentionPopupRef = useRef<MentionPopupHandle>(null);
-  const linkPopupRef = useRef<MentionPopupHandle>(null);
+  // const linkPopupRef = useRef<MentionPopupHandle>(null);
+
+  const nodes = useAtomValue(nodesAtom);
+  const [activeNodeId, setActiveNodeId] = useAtom(activeNodeIdAtom);
 
   // Content ops target the effective node; focus/active uses the structural nodeId
   const contentNodeId = effectiveNodeId ?? nodeId;
+  const [content, setContent] = useState(
+    () => nodes[contentNodeId]?.content ?? "",
+  );
+  const [mentions, setMentions] = useState<IMention[]>(
+    () => nodes[contentNodeId]?.mentions ?? [],
+  );
 
-  const content = useStore((s) => s.nodes[contentNodeId]?.content ?? "");
-  const nodes = useStore((s) => s.nodes);
-  const activeNodeId = useStore((s) => s.activeNodeId);
-  const focusCursorAtEnd = useStore((s) => s.focusCursorAtEnd);
-  const updateContent = useStore((s) => s.updateContent);
-  const setActiveNode = useStore((s) => s.setActiveNode);
-  const setActiveProject = useStore((s) => s.setActiveProject);
-  const createLinkNode = useStore((s) => s.createLinkNode);
+  // const content = useStore((s) => s.nodes[contentNodeId]?.content ?? "");
+  // const nodes = useStore((s) => s.nodes);
+  // const activeNodeId = useStore((s) => s.activeId);
+  // const focusCursorAtEnd = useStore((s) => s.focusCursorAtEnd);
+  // const updateContent = useStore((s) => s.updateContent);
+  // const setActiveNode = useStore((s) => s.setActiveNode);
+  // const setActiveProject = useStore((s) => s.setActiveProject);
+  // const createLinkNode = useStore((s) => s.createLinkNode);
 
   const { handleKeyDown: handleNodeKeyDown } = useNodeKeyboard({
-    nodeId,
+    node: nodes[nodeId],
+    index: 0,
     divRef,
-    isProjectTitle,
+    isRootTitle,
   });
 
   const isActive = activeNodeId === nodeId;
@@ -63,25 +67,19 @@ export function NodeContent({
     query: string;
     anchorRect: DOMRect;
   } | null>(null);
-  const [linkState, setLinkState] = useState<{
-    query: string;
-    anchorRect: DOMRect;
-  } | null>(null);
+  // const [linkState, setLinkState] = useState<{
+  //   query: string;
+  //   anchorRect: DOMRect;
+  // } | null>(null);
 
   // ── Navigate to the node's owning project and focus it ──────────────────────
   const handleMentionClick = useCallback(
     (mentionedNodeId: string) => {
-      const allNodes = useStore.getState().nodes;
-      const target = allNodes[mentionedNodeId];
-      if (!target) return;
-      let root = target;
-      while (root.parentId && allNodes[root.parentId]) {
-        root = allNodes[root.parentId];
-      }
-      setActiveProject(root.id);
-      setActiveNode(mentionedNodeId, false);
+      const root = findRoot(nodes[mentionedNodeId], nodes);
+      if (!root) return;
+      setActiveNodeId(root.id);
     },
-    [setActiveProject, setActiveNode],
+    [setActiveNodeId],
   );
 
   // ── DOM ↔ store sync ─────────────────────────────────────────────────────────
@@ -103,188 +101,188 @@ export function NodeContent({
     const sel = window.getSelection();
     if (!sel) return;
     const range = document.createRange();
-    if (focusCursorAtEnd) {
-      range.selectNodeContents(div);
-      range.collapse(false);
-    } else {
-      range.selectNodeContents(div);
-      range.collapse(true);
-    }
+    // if (focusCursorAtEnd) {
+    //   range.selectNodeContents(div);
+    //   range.collapse(false);
+    // } else {
+    range.selectNodeContents(div);
+    range.collapse(true);
+    // }
     sel.removeAllRanges();
     sel.addRange(range);
-  }, [isActive, focusCursorAtEnd]);
+  }, [isActive]);
 
   // ── Input handler ────────────────────────────────────────────────────────────
   const handleInput = useCallback(() => {
     const div = divRef.current;
     if (!div) return;
     const { content: newContent, mentions } = serializeFromDOM(div);
-    updateContent(contentNodeId, newContent, mentions);
+    // updateContent(contentNodeId, newContent, mentions);
+    setContent(newContent);
+    setMentions(mentions);
 
     // Prefer link trigger over mention trigger (both can't be open simultaneously)
-    const linkQuery = getLinkQueryAtCursor(div);
-    if (linkQuery !== null) {
-      const sel = window.getSelection();
-      const rect = sel?.rangeCount
-        ? sel.getRangeAt(0).getBoundingClientRect()
-        : new DOMRect();
-      setLinkState((prev) =>
-        prev
-          ? { ...prev, query: linkQuery }
-          : { query: linkQuery, anchorRect: rect },
-      );
-      setMentionState(null);
-      return;
-    }
-    setLinkState(null);
+    // const linkQuery = getLinkQueryAtCursor(div);
+    // if (linkQuery !== null) {
+    //   const sel = window.getSelection();
+    //   const rect = sel?.rangeCount
+    //     ? sel.getRangeAt(0).getBoundingClientRect()
+    //     : new DOMRect();
+    //   // setLinkState((prev) =>
+    //   //   prev
+    //   //     ? { ...prev, query: linkQuery }
+    //   //     : { query: linkQuery, anchorRect: rect },
+    //   // );
+    //   setMentionState(null);
+    //   return;
+    // }
+    // // setLinkState(null);
 
-    const mentionQuery = getMentionQueryAtCursor(div);
-    if (mentionQuery !== null) {
-      const sel = window.getSelection();
-      const rect = sel?.rangeCount
-        ? sel.getRangeAt(0).getBoundingClientRect()
-        : new DOMRect();
-      setMentionState((prev) =>
-        prev
-          ? { ...prev, query: mentionQuery }
-          : { query: mentionQuery, anchorRect: rect },
-      );
-    } else {
-      setMentionState(null);
-    }
-  }, [contentNodeId, updateContent]);
+    // const mentionQuery = getMentionQueryAtCursor(div);
+    // if (mentionQuery !== null) {
+    //   const sel = window.getSelection();
+    //   const rect = sel?.rangeCount
+    //     ? sel.getRangeAt(0).getBoundingClientRect()
+    //     : new DOMRect();
+    //   setMentionState((prev) =>
+    //     prev
+    //       ? { ...prev, query: mentionQuery }
+    //       : { query: mentionQuery, anchorRect: rect },
+    //   );
+    // } else {
+    //   setMentionState(null);
+    // }
+  }, [contentNodeId]);
 
   // ── Mention insertion ────────────────────────────────────────────────────────
-  const insertMention = useCallback(
-    (selectedNode: NodeData) => {
-      const div = divRef.current;
-      if (!div || !mentionState) return;
-      const sel = window.getSelection();
-      if (!sel || !sel.isCollapsed) return;
+  // const insertMention = useCallback(
+  //   (selectedNode: INode) => {
+  //     const div = divRef.current;
+  //     if (!div || !mentionState) return;
+  //     const sel = window.getSelection();
+  //     if (!sel || !sel.isCollapsed) return;
 
-      const deleteCount = mentionState.query.length + 1; // +1 for '@'
-      const range = sel.getRangeAt(0).cloneRange();
-      if (range.startOffset < deleteCount) return;
+  //     const deleteCount = mentionState.query.length + 1; // +1 for '@'
+  //     const range = sel.getRangeAt(0).cloneRange();
+  //     if (range.startOffset < deleteCount) return;
 
-      range.setStart(range.startContainer, range.startOffset - deleteCount);
-      range.deleteContents();
+  //     range.setStart(range.startContainer, range.startOffset - deleteCount);
+  //     range.deleteContents();
 
-      const span = createMentionSpan(
-        selectedNode.id,
-        selectedNode.content,
-        handleMentionClick,
-      );
-      range.insertNode(span);
+  //     const span = createMentionSpan(
+  //       selectedNode.id,
+  //       selectedNode.content,
+  //       handleMentionClick,
+  //     );
+  //     range.insertNode(span);
 
-      const space = document.createTextNode("\u00a0");
-      if (span.nextSibling) {
-        div.insertBefore(space, span.nextSibling);
-      } else {
-        div.appendChild(space);
-      }
+  //     const space = document.createTextNode("\u00a0");
+  //     if (span.nextSibling) {
+  //       div.insertBefore(space, span.nextSibling);
+  //     } else {
+  //       div.appendChild(space);
+  //     }
 
-      const newRange = document.createRange();
-      newRange.setStartAfter(space);
-      newRange.collapse(true);
-      sel.removeAllRanges();
-      sel.addRange(newRange);
+  //     const newRange = document.createRange();
+  //     newRange.setStartAfter(space);
+  //     newRange.collapse(true);
+  //     sel.removeAllRanges();
+  //     sel.addRange(newRange);
 
-      const { content: newContent, mentions } = serializeFromDOM(div);
-      updateContent(contentNodeId, newContent, mentions);
-      setMentionState(null);
-    },
-    [mentionState, contentNodeId, updateContent, handleMentionClick],
-  );
+  //     const { content: newContent, mentions } = serializeFromDOM(div);
+  //     updateContent(contentNodeId, newContent, mentions);
+  //     setMentionState(null);
+  //   },
+  //   [mentionState, contentNodeId, updateContent, handleMentionClick],
+  // );
 
-  // ── Link node creation ───────────────────────────────────────────────────────
-  const insertLinkNode = useCallback(
-    (selectedNode: NodeData) => {
-      const div = divRef.current;
-      if (!div || !linkState) return;
-      const sel = window.getSelection();
-      if (!sel || !sel.isCollapsed) return;
+  // // ── Link node creation ───────────────────────────────────────────────────────
+  // const insertLinkNode = useCallback(
+  //   (selectedNode: INode) => {
+  //     const div = divRef.current;
+  //     if (!div || !linkState) return;
+  //     const sel = window.getSelection();
+  //     if (!sel || !sel.isCollapsed) return;
 
-      const deleteCount = linkState.query.length + 2; // +2 for '[['
-      const range = sel.getRangeAt(0).cloneRange();
-      if (range.startOffset < deleteCount) return;
+  //     const deleteCount = linkState.query.length + 2; // +2 for '[['
+  //     const range = sel.getRangeAt(0).cloneRange();
+  //     if (range.startOffset < deleteCount) return;
 
-      // Delete '[[query' from the current node's text
-      range.setStart(range.startContainer, range.startOffset - deleteCount);
-      range.deleteContents();
+  //     // Delete '[[query' from the current node's text
+  //     range.setStart(range.startContainer, range.startOffset - deleteCount);
+  //     range.deleteContents();
 
-      // Update the current node's content (without the [[query text)
-      const { content: newContent, mentions } = serializeFromDOM(div);
-      updateContent(contentNodeId, newContent, mentions);
+  //     // Update the current node's content (without the [[query text)
+  //     const { content: newContent, mentions } = serializeFromDOM(div);
+  //     updateContent(contentNodeId, newContent, mentions);
 
-      // Create the linked node as the next sibling of the structural nodeId
-      const newLinkId = createLinkNode(selectedNode.id, nodeId);
-      setActiveNode(newLinkId, false);
-      setLinkState(null);
-    },
-    [
-      linkState,
-      contentNodeId,
-      nodeId,
-      updateContent,
-      createLinkNode,
-      setActiveNode,
-    ],
-  );
+  //     // Create the linked node as the next sibling of the structural nodeId
+  //     const newLinkId = createLinkNode(selectedNode.id, nodeId);
+  //     setActiveNode(newLinkId, false);
+  //     setLinkState(null);
+  //   },
+  //   [
+  //     linkState,
+  //     contentNodeId,
+  //     nodeId,
+  //     updateContent,
+  //     createLinkNode,
+  //     setActiveNode,
+  //   ],
+  // );
 
   // ── Keyboard: intercept popup nav before node shortcuts ─────────────────────
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLDivElement>) => {
-      const activePopup = mentionState
-        ? mentionPopupRef
-        : linkState
-          ? linkPopupRef
-          : null;
-      if (activePopup) {
-        if (e.key === "ArrowDown") {
-          e.preventDefault();
-          activePopup.current?.moveDown();
-          return;
-        }
-        if (e.key === "ArrowUp") {
-          e.preventDefault();
-          activePopup.current?.moveUp();
-          return;
-        }
-        if (e.key === "Enter") {
-          e.preventDefault();
-          activePopup.current?.selectCurrent();
-          return;
-        }
-        if (e.key === "Escape") {
-          e.preventDefault();
-          setMentionState(null);
-          setLinkState(null);
-          return;
-        }
-      }
+      // const activePopup = mentionState
+      //   ? mentionPopupRef
+      //   : linkState
+      //     ? linkPopupRef
+      //     : null;
+      // if (activePopup) {
+      //   if (e.key === "ArrowDown") {
+      //     e.preventDefault();
+      //     activePopup.current?.moveDown();
+      //     return;
+      //   }
+      //   if (e.key === "ArrowUp") {
+      //     e.preventDefault();
+      //     activePopup.current?.moveUp();
+      //     return;
+      //   }
+      //   if (e.key === "Enter") {
+      //     e.preventDefault();
+      //     activePopup.current?.selectCurrent();
+      //     return;
+      //   }
+      //   if (e.key === "Escape") {
+      //     e.preventDefault();
+      //     setMentionState(null);
+      //     setLinkState(null);
+      //     return;
+      //   }
+      // }
       handleNodeKeyDown(e);
     },
-    [mentionState, linkState, handleNodeKeyDown],
+    [handleNodeKeyDown],
   );
 
-  const handleFocus = useCallback(() => {
-    if (!isActive) setActiveNode(nodeId, false);
-  }, [nodeId, isActive, setActiveNode]);
+  const handleFocus = () => setActiveNodeId(nodeId);
 
   return (
     <>
       <div
         ref={divRef}
-        className={`${styles.editor}${strikethrough ? ` ${styles.strikethrough}` : ""}`}
+        className={clsx(styles.editor, strikethrough && styles.strikethrough)}
         contentEditable
-        suppressContentEditableWarning
+        // suppressContentEditableWarning
         data-node-id={nodeId}
         data-placeholder={placeholder}
         onInput={handleInput}
         onKeyDown={handleKeyDown}
         onFocus={handleFocus}
       />
-      {mentionState && (
+      {/* {mentionState && (
         <MentionPopup
           ref={mentionPopupRef}
           query={mentionState.query}
@@ -293,8 +291,8 @@ export function NodeContent({
           onSelect={insertMention}
           onClose={() => setMentionState(null)}
         />
-      )}
-      {linkState && (
+      )} */}
+      {/* {linkState && (
         <MentionPopup
           ref={linkPopupRef}
           query={linkState.query}
@@ -303,7 +301,7 @@ export function NodeContent({
           onSelect={insertLinkNode}
           onClose={() => setLinkState(null)}
         />
-      )}
+      )} */}
     </>
   );
 }

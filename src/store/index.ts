@@ -1,8 +1,8 @@
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import { generateId } from "../lib/id";
-import { getSiblings } from "../lib/tree";
-import type { NodeData, NodeMap } from "../types/node";
+import { createNode, getSiblings, ROOT_ID } from "../lib/tree";
+import type { INode, INodeMap } from "../types/node";
 import type { TreeActions, TreeState } from "./slices/treeSlice";
 import type { UIActions, UIState } from "./slices/uiSlice";
 
@@ -12,7 +12,7 @@ type StoreState = TreeState & TreeActions & UIState & UIActions;
 // Stored outside Zustand/Immer state to avoid draft-proxy complications when
 // restoring previous snapshots. canUndo/canRedo stay in reactive state for UI.
 interface Snapshot {
-  nodes: NodeMap;
+  nodes: INodeMap;
   rootIds: string[];
 }
 const past: Snapshot[] = [];
@@ -20,19 +20,46 @@ const future: Snapshot[] = [];
 const MAX_HISTORY = 50;
 let lastTextSnapshotAt = 0;
 
-function takeSnapshot(nodes: NodeMap, rootIds: string[]) {
+function takeSnapshot(nodes: INodeMap, rootIds: string[]) {
   past.push({ nodes, rootIds: [...rootIds] });
   if (past.length > MAX_HISTORY) past.shift();
   future.length = 0;
 }
 
+export const useTreeStore = create<TreeState>()(
+  immer((set, _get) => ({
+    nodes: createNode(ROOT_ID),
+    pinnedIds: [ROOT_ID],
+    dailyIds: [],
+
+    load: (tree: INode, dailyIds: string[], pinnedIds: string[]) => {
+      set((state) => {
+        state.tree = tree;
+        state.dailyIds = dailyIds;
+        state.pinnedIds = pinnedIds;
+      });
+    },
+
+    update: (nodeId: string, changes: Partial<INode>) => {
+      set((state) => {
+        if (!state.tree[nodeId]) {
+          console.error(`Node ${nodeId} not found while applying update`, {});
+          return;
+        }
+        state.tree[nodeId] = { ...state.tree[nodeId], ...content };
+      });
+    },
+  })),
+);
+
 export const useStore = create<StoreState>()(
   immer((set, _get) => ({
     // --- Tree State ---
-    nodes: {},
-    rootIds: [],
+    tree: createNode(ROOT_ID),
+    pinnedIds: [ROOT_ID],
+    dailyIds: [],
 
-    loadNodes(nodes: NodeData[], rootIds: string[]) {
+    loadNodes(nodes: INode[], rootIds: string[]) {
       set((state) => {
         state.nodes = {};
         for (const n of nodes) {
@@ -83,7 +110,7 @@ export const useStore = create<StoreState>()(
     updateContent(
       id: string,
       content: string,
-      mentions?: import("../types/node").MentionRef[],
+      mentions?: import("../types/node").IMention[],
     ) {
       const now = Date.now();
       const shouldSnapshot = now - lastTextSnapshotAt >= 1000;
@@ -371,7 +398,7 @@ export const useStore = create<StoreState>()(
 
     setActiveNode(id: string | null, cursorAtEnd = false) {
       set((state) => {
-        state.activeNodeId = id;
+        state.activeId = id;
         state.focusCursorAtEnd = cursorAtEnd;
       });
     },
@@ -451,7 +478,7 @@ export const selectNode = (id: string) => (state: StoreState) =>
   state.nodes[id];
 export const selectRootIds = (state: StoreState) => state.rootIds;
 export const selectNodes = (state: StoreState) => state.nodes;
-export const selectActiveNodeId = (state: StoreState) => state.activeNodeId;
+export const selectActiveNodeId = (state: StoreState) => state.activeId;
 export const selectActiveProjectId = (state: StoreState) =>
   state.activeProjectId;
 export const selectActiveView = (state: StoreState) => state.activeView;

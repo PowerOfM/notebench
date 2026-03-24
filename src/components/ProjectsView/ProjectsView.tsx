@@ -1,16 +1,20 @@
+import { useLiveQuery } from "dexie-react-hooks";
+import { atom, useAtom } from "jotai";
 import { useCallback } from "react";
-import { useStore } from "../../store";
+import { db } from "../../lib/db";
 import { NodeContent } from "../NodeContent/NodeContent";
 import { NodeTree } from "../NodeTree/NodeTree";
 import styles from "./ProjectsView.module.css";
 
-export function ProjectsView() {
-  const activeProjectId = useStore((s) => s.activeProjectId);
-  const activeProject = useStore((s) => s.nodes[activeProjectId!]);
-  const createNode = useStore((s) => s.createNode);
-  const setActiveNode = useStore((s) => s.setActiveNode);
+const activeProjectIdAtom = atom<string | null>(null);
 
-  const handleAddFirstNode = useCallback(() => {
+export function ProjectsView() {
+  const pinnedNodes = useLiveQuery(() =>
+    db.nodes.where("isPinned").equals(1).toArray(),
+  );
+  const [activeProjectId, setActiveProjectId] = useAtom(activeProjectIdAtom);
+
+  const handleAddNode = useCallback(() => {
     if (!activeProjectId) return;
     const id = createNode(activeProjectId);
     setActiveNode(id, false);
@@ -31,21 +35,7 @@ export function ProjectsView() {
         )}
       </div>
       <div className={styles.content}>
-        {activeProject.childrenIds.length === 0 ? (
-          <div
-            className={styles.emptyState}
-            style={{ height: "auto", paddingTop: 32 }}
-          >
-            <button
-              className={styles.emptyStateBtn}
-              onClick={handleAddFirstNode}
-            >
-              + Add note
-            </button>
-          </div>
-        ) : (
-          <NodeTree rootIds={activeProject.childrenIds} />
-        )}
+        <NodeTree rootIds={activeProject.childrenIds} />
       </div>
     </div>
   );

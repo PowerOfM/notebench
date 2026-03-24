@@ -1,24 +1,23 @@
-export interface UIState {
-  activeNodeId: string | null;
-  focusCursorAtEnd: boolean;
-  sidebarCollapsed: boolean;
-  activeView: 'project' | 'workbench';
-  activeProjectId: string | null;
+export interface ISettings {
   projectColumns: number;
   dailyColumns: number;
-  settingsPanelOpen: boolean;
-  canUndo: boolean;
-  canRedo: boolean;
+}
+
+export interface UIState {
+  activeParentId: string | null;
+  activeView: "project" | "workbench";
+  activeId: string | null;
+  focusCursorAtEnd: boolean;
+  sidebarCollapsed: boolean;
+  settings: ISettings;
+  settingsOpen: boolean;
 }
 
 export interface UIActions {
-  setActiveNode: (id: string | null, cursorAtEnd?: boolean) => void;
+  setActive: (id: string | null, cursorAtEnd?: boolean) => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
-  setActiveView: (view: 'project' | 'workbench') => void;
-  setActiveProject: (id: string | null) => void;
-  setProjectColumns: (n: number) => void;
-  setDailyColumns: (n: number) => void;
+  setActiveView: (view: "project" | "workbench") => void;
+  setActiveParent: (id: string | null) => void;
+  setSettings: (settings: ISettings) => void;
   setSettingsPanelOpen: (open: boolean) => void;
-  undo: () => void;
-  redo: () => void;
 }

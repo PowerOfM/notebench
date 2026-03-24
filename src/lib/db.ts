@@ -1,5 +1,6 @@
-import Dexie, { type Table } from 'dexie';
-import type { NodeData } from '../types/node';
+import Dexie, { type Table } from "dexie";
+import type { INode, INodeChanges } from "../types/node";
+import { generateId } from "./id";
 
 export interface MetaEntry {
   key: string;
@@ -7,29 +8,27 @@ export interface MetaEntry {
 }
 
 class NotebenchDB extends Dexie {
-  nodes!: Table<NodeData, string>;
+  nodes!: Table<INode, "id">;
   meta!: Table<MetaEntry, string>;
 
   constructor() {
-    super('notebench');
+    super("notebench");
     this.version(1).stores({
-      nodes: 'id, parentId, isDaily, dailyDate',
-      meta: 'key',
+      nodes: "++id, parentId, rootId, isPinned, isDaily",
+      meta: "key",
     });
-    // v2: adds linkedNodeId field — no new index, migrate existing rows to null
-    this.version(2)
-      .stores({
-        nodes: 'id, parentId, isDaily, dailyDate',
-        meta: 'key',
-      })
-      .upgrade((tx) =>
-        tx
-          .table('nodes')
-          .toCollection()
-          .modify((node) => {
-            if (!('linkedNodeId' in node)) node.linkedNodeId = null;
-          })
-      );
+  }
+
+  createNode(input: INodeChanges = {}) {
+    this.nodes.add({
+      ...input,
+      id: generateId(),
+      content: "",
+      parentId: input.parentId ?? null,
+      rootId: input.rootId ?? null,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    });
   }
 }
 

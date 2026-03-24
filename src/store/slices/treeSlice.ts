@@ -1,27 +1,17 @@
-// Type definitions for tree slice — implementation lives in store/index.ts
-import type { NodeData, NodeMap } from '../../types/node';
+import type { INode, INodeMap } from "../../types/node";
 
 export interface TreeState {
-  nodes: NodeMap;
-  rootIds: string[];
+  nodes: INodeMap;
+  dailyIds: string[];
+  pinnedIds: string[];
 }
 
 export interface TreeActions {
-  loadNodes: (nodes: NodeData[], rootIds: string[]) => void;
-  createNode: (parentId: string | null, afterId?: string) => string;
-  updateContent: (id: string, content: string, mentions?: import('../../types/node').MentionRef[]) => void;
-  deleteNode: (id: string) => void;
-  indentNode: (id: string) => void;
-  outdentNode: (id: string) => void;
-  moveNode: (id: string, newParentId: string | null, newIndex: number) => void;
-  toggleCollapsed: (id: string) => void;
-  toggleChecked: (id: string) => void;
-  cycleProjectStatus: (id: string) => void;
-  setStatusType: (id: string, statusType: import('../../types/node').StatusType) => void;
-  /** Create a new link node (linkedNodeId = targetId) inserted after afterSiblingId. Returns new node id. */
-  createLinkNode: (targetId: string, afterSiblingId: string) => string;
-  /** Detach the link: copy target content/status into link node, set linkedNodeId = null. */
-  unlinkNode: (linkNodeId: string) => void;
-  /** Create a root-level daily node for the given ISO date. Returns new node id. */
-  createDailyNode: (date: string) => string;
+  load: (tree: INode, dailyIds: string[], pinnedIds: string[]) => void;
+  update: (nodeId: string, content: Partial<INode>) => void;
+  create: (parentId: string | null, index?: number) => string;
+  move: (nodeId: string, newParentId: string | null, newIndex: number) => void;
+  remove: (id: string) => void;
+  setIsPinned: (id: string, pinned: boolean) => void;
+  setIsDaily: (id: string, daily: boolean) => void;
 }

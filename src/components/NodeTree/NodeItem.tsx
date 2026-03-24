@@ -69,14 +69,9 @@ export const NodeItem = memo(function NodeItem({
 
   // Use getState() for resolveLink — reads current state without subscribing to
   // the full nodes map (avoids re-rendering all NodeItems on any node change)
-  const effectiveNode = isLink
+  const linkedNode = isLink
     ? resolveLink(nodeId, useStore.getState().nodes)
-    : node;
-  const cssVars = {
-    "--depth": depth,
-    transform: CSS.Transform.toString(transform),
-    transition,
-  } as React.CSSProperties;
+    : null;
 
   if (!node) {
     return null;
@@ -84,6 +79,11 @@ export const NodeItem = memo(function NodeItem({
 
   const effectiveId = effectiveNode!.id;
   const hasChildren = effectiveNode!.childrenIds.length > 0;
+  const cssVars = {
+    "--depth": depth,
+    transform: CSS.Transform.toString(transform),
+    transition,
+  } as React.CSSProperties;
 
   return (
     <div

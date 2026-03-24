@@ -1,11 +1,15 @@
-import { usePersistence } from './hooks/usePersistence';
-import { useUndoRedo } from './hooks/useUndoRedo';
-import { Layout } from './components/Layout/Layout';
+import { Sidebar } from "./components/Layout/Sidebar";
+import { NodeView } from "./components/NodeView/NodeView";
 
 function App() {
-  usePersistence();
-  useUndoRedo();
-  return <Layout />;
+  // usePersistence();
+  // useUndoRedo();
+  return (
+    <div>
+      <Sidebar />
+      <NodeView />
+    </div>
+  );
 }
 
 export default App;

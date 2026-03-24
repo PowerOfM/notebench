@@ -1,5 +1,5 @@
-import { useStore } from '../../store';
-import styles from './FloatingToolbar.module.css';
+import { useStore } from "../../store";
+import styles from "./FloatingToolbar.module.css";
 
 /**
  * Floating bottom toolbar for touch/mobile devices.
@@ -7,7 +7,7 @@ import styles from './FloatingToolbar.module.css';
  * otherwise require a keyboard. Visible only when a node is active.
  */
 export function FloatingToolbar() {
-  const activeNodeId = useStore((s) => s.activeNodeId);
+  const activeNodeId = useStore((s) => s.activeId);
   const indentNode = useStore((s) => s.indentNode);
   const outdentNode = useStore((s) => s.outdentNode);
   const cycleProjectStatus = useStore((s) => s.cycleProjectStatus);
@@ -31,9 +31,9 @@ export function FloatingToolbar() {
   };
 
   const handleStatusToggle = () => {
-    if (node.statusType === 'checkable') {
+    if (node.statusType === "checkable") {
       toggleChecked(activeNodeId);
-    } else if (node.statusType === 'project') {
+    } else if (node.statusType === "project") {
       cycleProjectStatus(activeNodeId);
     }
   };
@@ -42,7 +42,10 @@ export function FloatingToolbar() {
     <div className={styles.toolbar} role="toolbar" aria-label="Node actions">
       <button
         className={styles.btn}
-        onPointerDown={(e) => { e.preventDefault(); undo(); }}
+        onPointerDown={(e) => {
+          e.preventDefault();
+          undo();
+        }}
         aria-label="Undo (Cmd+Z)"
         title="Undo"
         disabled={!canUndo}
@@ -51,7 +54,10 @@ export function FloatingToolbar() {
       </button>
       <button
         className={styles.btn}
-        onPointerDown={(e) => { e.preventDefault(); redo(); }}
+        onPointerDown={(e) => {
+          e.preventDefault();
+          redo();
+        }}
         aria-label="Redo (Cmd+Shift+Z)"
         title="Redo"
         disabled={!canRedo}
@@ -61,7 +67,10 @@ export function FloatingToolbar() {
       <div className={styles.separator} aria-hidden="true" />
       <button
         className={styles.btn}
-        onPointerDown={(e) => { e.preventDefault(); outdentNode(activeNodeId); }}
+        onPointerDown={(e) => {
+          e.preventDefault();
+          outdentNode(activeNodeId);
+        }}
         aria-label="Outdent node (Shift+Tab)"
         title="Outdent"
       >
@@ -69,16 +78,22 @@ export function FloatingToolbar() {
       </button>
       <button
         className={styles.btn}
-        onPointerDown={(e) => { e.preventDefault(); indentNode(activeNodeId); }}
+        onPointerDown={(e) => {
+          e.preventDefault();
+          indentNode(activeNodeId);
+        }}
         aria-label="Indent node (Tab)"
         title="Indent"
       >
         →
       </button>
-      {(node.statusType === 'checkable' || node.statusType === 'project') && (
+      {(node.statusType === "checkable" || node.statusType === "project") && (
         <button
           className={styles.btn}
-          onPointerDown={(e) => { e.preventDefault(); handleStatusToggle(); }}
+          onPointerDown={(e) => {
+            e.preventDefault();
+            handleStatusToggle();
+          }}
           aria-label="Toggle status"
           title="Toggle status"
         >
@@ -87,7 +102,10 @@ export function FloatingToolbar() {
       )}
       <button
         className={styles.btn}
-        onPointerDown={(e) => { e.preventDefault(); handleNewNode(); }}
+        onPointerDown={(e) => {
+          e.preventDefault();
+          handleNewNode();
+        }}
         aria-label="New node below (Enter)"
         title="New node"
       >

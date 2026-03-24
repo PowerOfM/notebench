@@ -1,5 +1,8 @@
-import type { NodeData, NodeMap } from "../types/node";
+import type { INode, INodeChanges, INodeMap } from "../types/node";
+import { generateId } from "./id";
 import { resolveLink } from "./linkResolver";
+
+export const ROOT_ID = "$$root$$";
 
 export interface FlatNode {
   id: string;
@@ -10,6 +13,33 @@ export interface DragProjection {
   depth: number;
   parentId: string | null;
   index: number;
+}
+
+export function createNode(input: INodeChanges = {}): INode {
+  return {
+    ...input,
+    id: generateId(),
+    parentId: input.parentId ?? null,
+    content: "",
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  };
+}
+
+export function findRoot(node: INode, nodes: INodeMap): INode | null {
+  if (node.parentId === null) {
+    return node;
+  }
+  const parent = nodes[node.parentId];
+  return parent ? findRoot(parent, nodes) : null;
+}
+
+export function findSiblingUp(node: INode, nodes: INodeMap): INode | null {
+  if (node.parentId === null) {
+    return null;
+  }
+  const parent = nodes[node.parentId];
+  return parent ? findSiblingUp(parent, nodes) : null;
 }
 
 function arrayMove<T>(array: T[], from: number, to: number): T[] {
@@ -103,7 +133,7 @@ export function flattenVisible(
  * Get siblings of a node (children of its parent, or rootIds).
  */
 export function getSiblings(
-  node: NodeData,
+  node: INode,
   nodes: NodeMap,
   rootIds: string[],
 ): string[] {

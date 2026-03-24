@@ -1,10 +1,10 @@
-import { useEffect, useRef } from 'react';
-import { useStore } from '../store';
-import { db } from '../lib/db';
-import type { NodeData, NodeMap } from '../types/node';
+import { useEffect, useRef } from "react";
+import { db } from "../lib/db";
+import { useStore } from "../store";
+import type { INode, INodeMap } from "../types/node";
 
-const SETTINGS_KEYS = ['projectColumns', 'dailyColumns'] as const;
-type SettingsKey = typeof SETTINGS_KEYS[number];
+const SETTINGS_KEYS = ["projectColumns", "dailyColumns"] as const;
+type SettingsKey = (typeof SETTINGS_KEYS)[number];
 
 /**
  * Loads data from IndexedDB on mount, then subscribes to store changes
@@ -24,7 +24,7 @@ export function usePersistence() {
   const deletedIdsRef = useRef<Set<string>>(new Set());
   const rootIdsDirtyRef = useRef(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const prevNodesRef = useRef<NodeMap>({});
+  const prevNodesRef = useRef<INodeMap>({});
   const prevRootIdsRef = useRef<string[]>([]);
 
   // Load from DB on mount
@@ -32,10 +32,12 @@ export function usePersistence() {
     async function load() {
       const [allNodes, rootIdsMeta, ...settingsMetas] = await Promise.all([
         db.nodes.toArray(),
-        db.meta.get('rootIds'),
+        db.meta.get("rootIds"),
         ...SETTINGS_KEYS.map((k) => db.meta.get(k)),
       ]);
-      const rootIds: string[] = rootIdsMeta ? (rootIdsMeta.value as string[]) : [];
+      const rootIds: string[] = rootIdsMeta
+        ? (rootIdsMeta.value as string[])
+        : [];
       loadNodes(allNodes, rootIds);
 
       // Restore settings
@@ -51,7 +53,7 @@ export function usePersistence() {
       // Auto-create today's daily node if it doesn't exist yet
       const todayDate = new Date().toISOString().slice(0, 10);
       const hasTodayNode = allNodes.some(
-        (n) => n.isDaily && n.dailyDate === todayDate
+        (n) => n.isDaily && n.dailyDate === todayDate,
       );
       if (!hasTodayNode) {
         createDailyNode(todayDate);
@@ -69,7 +71,13 @@ export function usePersistence() {
       }
     }
     load();
-  }, [loadNodes, setActiveProject, setProjectColumns, setDailyColumns, createDailyNode]);
+  }, [
+    loadNodes,
+    setActiveProject,
+    setProjectColumns,
+    setDailyColumns,
+    createDailyNode,
+  ]);
 
   // Save settings to meta when they change
   useEffect(() => {
@@ -137,16 +145,18 @@ export function usePersistence() {
         // the latest values rather than stale closure data.
         const liveState = useStore.getState();
 
-        const toSave: NodeData[] = [];
+        const toSave: INode[] = [];
         for (const id of dirty) {
           if (liveState.nodes[id]) toSave.push(liveState.nodes[id]);
         }
 
         await Promise.all([
           toSave.length > 0 ? db.nodes.bulkPut(toSave) : Promise.resolve(),
-          deletedIds.length > 0 ? db.nodes.bulkDelete(deletedIds) : Promise.resolve(),
+          deletedIds.length > 0
+            ? db.nodes.bulkDelete(deletedIds)
+            : Promise.resolve(),
           shouldSaveRootIds
-            ? db.meta.put({ key: 'rootIds', value: liveState.rootIds })
+            ? db.meta.put({ key: "rootIds", value: liveState.rootIds })
             : Promise.resolve(),
         ]);
       }, 300);

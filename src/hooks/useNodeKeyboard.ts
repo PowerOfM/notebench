@@ -1,75 +1,70 @@
+import { useSetAtom } from "jotai";
 import { useCallback } from "react";
-import { flattenVisible } from "../lib/tree";
-import { useStore } from "../store";
+import { makeAction, nodeActionAtom } from "../store/actions";
+import { INode } from "../types/node";
 
 interface UseNodeKeyboardOptions {
-  nodeId: string;
+  node: INode;
+  index: number;
   divRef: React.RefObject<HTMLDivElement | null>;
-  isProjectTitle?: boolean;
+  isRootTitle?: boolean;
 }
 
 export function useNodeKeyboard({
-  nodeId,
+  node,
+  index,
   divRef,
-  isProjectTitle = false,
+  isRootTitle = false,
 }: UseNodeKeyboardOptions) {
-  const store = useStore();
+  const dispatch = useSetAtom(nodeActionAtom);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLDivElement>) => {
-      const { nodes, rootIds } = store;
-      const node = nodes[nodeId];
-      if (!node) return;
-
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
-        if (isProjectTitle) {
+        if (isRootTitle) {
           // Focus first child, or create one if none exists
-          if (node.childrenIds.length > 0) {
-            store.setActiveNode(node.childrenIds[0], false);
+          if (node.childrenIds && node.childrenIds.length > 0) {
+            dispatch(makeAction.focus(node.childrenIds[0]));
           } else {
-            const newId = store.createNode(nodeId);
-            store.setActiveNode(newId, false);
+            dispatch(makeAction.create(node.id, 0, {}, false));
           }
-        } else {
-          const newId = store.createNode(node.parentId, nodeId);
-          // New sibling inherits the status type (but not the value)
-          if (node.statusType !== "none") {
-            store.setStatusType(newId, node.statusType);
-          }
-          store.setActiveNode(newId, false);
+          return;
         }
+
+        // TODO: split current node at cursor position, and potentially move children
+        dispatch(makeAction.create(node.parentId, index + 1, {}, false));
         return;
       }
 
       if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
-        const { statusType } = node;
-        if (statusType === "checkable") {
-          store.toggleChecked(nodeId);
-        } else if (statusType === "project") {
-          store.cycleProjectStatus(nodeId);
-        } else {
-          // Default: make it a checkable and check it
-          store.toggleChecked(nodeId);
+        if (node.status?.type === "checkbox") {
+          dispatch(
+            makeAction.update(node.id, {
+              status: { type: "checkbox", checked: !node.status.checked },
+            }),
+          );
         }
         return;
       }
 
       if (e.key === "Tab" && !e.shiftKey) {
         e.preventDefault();
-        store.indentNode(nodeId);
-        store.setActiveNode(nodeId, true);
+        console.log("TODO: implement indentNode");
+        // store.indentNode(nodeId);
+        // store.setActiveNode(nodeId, true);
         return;
       }
 
       if (e.key === "Tab" && e.shiftKey) {
         e.preventDefault();
+        console.log("TODO: implement outdentNode");
         // Don't outdent if already a direct child of a root project node
-        const parent = node.parentId ? nodes[node.parentId] : null;
-        if (!parent || parent.parentId === null) return;
-        store.outdentNode(nodeId);
-        store.setActiveNode(nodeId, true);
+        // const parent = node.parentId ? nodes[node.parentId] : null;
+        // if (!parent || parent.parentId === null) return;
+        // store.outdentNode(nodeId);
+        // store.setActiveNode(nodeId, true);
         return;
       }
 
@@ -77,68 +72,37 @@ export function useNodeKeyboard({
         const div = divRef.current;
         if (!div) return;
         const sel = window.getSelection();
-        const isEmpty = div.textContent === "";
+        const isEmpty =
+          div.textContent === "" &&
+          (node.childrenIds == null || node.childrenIds.length === 0);
         const atStart = sel?.anchorOffset === 0 && sel?.focusOffset === 0;
 
         if (isEmpty || atStart) {
           e.preventDefault();
           // Navigate to previous node before deleting
-          const flat = flattenVisible(rootIds, nodes);
-          const idx = flat.findIndex((f) => f.id === nodeId);
-          if (idx > 0) {
-            store.setActiveNode(flat[idx - 1].id, true);
-          }
-          if (isEmpty && store.nodes[nodeId].childrenIds.length === 0) {
-            store.deleteNode(nodeId);
-          }
+          // const flat = flattenVisible(rootIds, nodes);
+          // const idx = flat.findIndex((f) => f.id === nodeId);
+          // if (idx > 0) {
+          // store.setActiveNode(flat[idx - 1].id, true);
+          // }
+          dispatch(makeAction.remove(node));
           return;
         }
       }
 
       if (e.key === "ArrowUp") {
-        const div = divRef.current;
-        if (!div) return;
-        const sel = window.getSelection();
-        if (!sel || sel.rangeCount === 0) return;
-        const range = sel.getRangeAt(0);
-        // Check if cursor is at start of div
-        const preRange = document.createRange();
-        preRange.selectNodeContents(div);
-        preRange.setEnd(range.startContainer, range.startOffset);
-        const atStart = preRange.toString().length === 0;
-        if (atStart) {
-          e.preventDefault();
-          const flat = flattenVisible(rootIds, nodes);
-          const idx = flat.findIndex((f) => f.id === nodeId);
-          if (idx > 0) {
-            store.setActiveNode(flat[idx - 1].id, true);
-          }
-        }
+        e.preventDefault();
+        console.log("TODO: implement focusNodeUp");
         return;
       }
 
       if (e.key === "ArrowDown") {
-        const div = divRef.current;
-        if (!div) return;
-        const sel = window.getSelection();
-        if (!sel || sel.rangeCount === 0) return;
-        const range = sel.getRangeAt(0);
-        const postRange = document.createRange();
-        postRange.selectNodeContents(div);
-        postRange.setStart(range.endContainer, range.endOffset);
-        const atEnd = postRange.toString().length === 0;
-        if (atEnd) {
-          e.preventDefault();
-          const flat = flattenVisible(rootIds, nodes);
-          const idx = flat.findIndex((f) => f.id === nodeId);
-          if (idx < flat.length - 1) {
-            store.setActiveNode(flat[idx + 1].id, false);
-          }
-        }
+        e.preventDefault();
+        console.log("TODO: implement focusNodeDown");
         return;
       }
     },
-    [nodeId, store, divRef],
+    [node, index, dispatch, divRef],
   );
 
   return { handleKeyDown };
