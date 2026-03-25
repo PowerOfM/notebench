@@ -1,16 +1,14 @@
-import { atom, Getter, Setter } from "jotai";
-import { createNode } from "../lib/tree";
+import { Getter, Setter } from "jotai";
+import { makeAction } from "./actions";
 import type {
   IDispatchEvent,
   IDispatchEventGeneric,
-  INodeAction,
   INodeAddAction,
-  INodeFocusAction,
   INodeMoveAction,
   INodeRemoveAction,
   INodeUpdateAction,
 } from "../types/actions";
-import type { INode, INodeChanges, INodeMap } from "../types/node";
+import type { INode, INodeMap } from "../types/node";
 import {
   focusedIdAtom,
   nodesAtom,
@@ -60,6 +58,10 @@ export function handleUpdateNode(
 ) {
   const state = { ...get(nodesAtom) };
   const node = state[action.nodeId];
+  if (!node) {
+    console.error(`Node ${action.nodeId} not found while updating`);
+    return;
+  }
   const prev = pick(node, Object.keys(action.payload) as (keyof INode)[]);
 
   state[action.nodeId] = { ...node, ...action.payload, updatedAt: Date.now() };
@@ -76,6 +78,8 @@ export function handleUpdateNode(
   set(nodesAtom, state);
 }
 
+// ── Move helpers ─────────────────────────────────────────────────────────────
+
 function moveWithinList(
   mutableList: string[],
   nodeId: string,
@@ -87,7 +91,7 @@ function moveWithinList(
   }
 
   mutableList.splice(prevIndex, 1);
-  mutableList.splice(newIndex ?? mutableList.length - 1, 0, nodeId);
+  mutableList.splice(newIndex ?? mutableList.length, 0, nodeId);
   return prevIndex;
 }
 
@@ -150,21 +154,20 @@ function moveNodeEffect(
   nodes: INodeMap,
   action: INodeMoveAction,
 ) {
-  // Validate
   const node = nodes[action.nodeId];
+  if (!node) {
+    console.error(`Node ${action.nodeId} not found while moving`);
+    return;
+  }
   let nodesState = { ...nodes };
   let pinnedIdsState = [...get(pinnedIdsAtom)];
 
   let prevParentId = node.parentId;
-  let prevIndex = undefined;
+  let prevIndex: number | undefined;
+
   if (prevParentId == null) {
-    prevIndex = pinnedIdsState.indexOf(node.id);
-    if (prevIndex === -1) {
-      prevIndex = undefined;
-      console.warn(
-        `Node ${node.id} not found in pinned list while moving node`,
-      );
-    }
+    const idx = pinnedIdsState.indexOf(node.id);
+    prevIndex = idx >= 0 ? idx : undefined;
     pinnedIdsState = pinnedIdsState.filter((id) => id !== node.id);
   } else {
     const prevParent = nodes[prevParentId];
@@ -172,16 +175,17 @@ function moveNodeEffect(
       console.error(`Parent node ${prevParentId} not found while moving node`);
       return;
     }
-    prevIndex = prevParent.childrenIds?.indexOf(node.id);
-    if (prevIndex != null && prevIndex >= 0) {
-      prevIndex = undefined;
-    }
+    const idx = prevParent.childrenIds?.indexOf(node.id) ?? -1;
+    prevIndex = idx >= 0 ? idx : undefined;
     nodesState[prevParentId] = {
       ...prevParent,
       childrenIds: prevParent.childrenIds?.filter((id) => id !== node.id),
       updatedAt: Date.now(),
     };
   }
+
+  // Update node's parentId
+  nodesState[action.nodeId] = { ...nodesState[action.nodeId], parentId: action.parentId };
 
   if (action.parentId == null) {
     if (
@@ -226,29 +230,55 @@ function moveNodeEffect(
   set(undoStackAtom, [...get(undoStackAtom), undoAction]);
 }
 
-function handleRemoveAction(
+export function handleMoveNode(
+  get: Getter,
+  set: Setter,
+  action: INodeMoveAction,
+) {
+  const nodes = get(nodesAtom);
+  const node = nodes[action.nodeId];
+  if (!node) {
+    console.error(`Node ${action.nodeId} not found while moving node`, action);
+    return;
+  }
+
+  if (node.parentId == null && action.parentId == null) {
+    moveWithinPinnedEffect(get, set, node.id, action.index);
+  } else if (node.parentId === action.parentId) {
+    moveWithinParentEffect(get, set, nodes, action);
+  } else {
+    moveNodeEffect(get, set, nodes, action);
+  }
+}
+
+export function handleRemoveNode(
   get: Getter,
   set: Setter,
   action: INodeRemoveAction,
 ) {
   const state = { ...get(nodesAtom) };
   const prev = state[action.node.id];
+  if (!prev) {
+    console.error(`Node ${action.node.id} not found while removing`);
+    return;
+  }
 
   let prevParentId = prev.parentId;
-  let prevIndex = undefined;
+  let prevIndex: number | undefined;
+
   if (prevParentId) {
     const parent = state[prevParentId];
     if (!parent) {
       prevParentId = null;
     } else {
-      prevIndex = parent.childrenIds?.indexOf(prev.id);
-      if (prevIndex === -1) {
+      const idx = parent.childrenIds?.indexOf(prev.id) ?? -1;
+      if (idx === -1) {
         console.error(
           `Node ${prev.id} not found in parent ${prevParentId} while removing node`,
           action,
         );
-        prevIndex = undefined;
       } else {
+        prevIndex = idx;
         state[prevParentId] = {
           ...parent,
           childrenIds: parent.childrenIds?.filter((id) => id !== prev.id),
@@ -259,29 +289,23 @@ function handleRemoveAction(
   }
 
   if (prevParentId == null) {
-    const list = get(pinnedIdsAtom);
-    prevIndex = list.indexOf(prev.id);
-    if (prevIndex === -1) {
+    const list = [...get(pinnedIdsAtom)];
+    const idx = list.indexOf(prev.id);
+    if (idx === -1) {
       console.error(
         `Node ${prev.id} not found in pinned list while removing node`,
         action,
       );
-      prevIndex = undefined;
     } else {
-      const nextList = [...list];
-      nextList.splice(prevIndex, 1);
-      set(pinnedIdsAtom, nextList);
+      prevIndex = idx;
+      list.splice(idx, 1);
+      set(pinnedIdsAtom, list);
     }
   }
 
-  delete state[action.nodeId];
+  delete state[action.node.id];
   set(nodesAtom, state);
 
-  const undoAction = makeAction.create(prevParentId, prevIndex, prev);
+  const undoAction = makeAction.create(prevParentId ?? null, prev, prevIndex);
   set(undoStackAtom, [...get(undoStackAtom), undoAction]);
-}
-
-export function handleFocusAction(get: Getter, set: Setter, action: I) {
-  const focusedState = get(focusedIdAtom);
-  set(focusedIdAtom, action.nodeId);
 }

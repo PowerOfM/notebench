@@ -5,11 +5,10 @@ import { useNodeKeyboard } from "../../hooks/useNodeKeyboard";
 import { renderToDOM, serializeFromDOM } from "../../lib/contentParser";
 import { findRoot } from "../../lib/tree";
 import { focusedIdAtom, nodesAtom } from "../../store/atoms";
-import type { IMention } from "../../types/node";
-import { type MentionPopupHandle } from "../MentionPopup/MentionPopup";
+import { makeAction } from "../../store/actions";
+import { nodeActionAtom } from "../../store/dispatch";
 import styles from "./NodeContent.module.css";
-import { useSetAtom } from "jotai/ts3.8/esm/react";
-import { nodeActionAtom } from "../../store/actions";
+import { useSetAtom } from "jotai";
 
 interface NodeContentProps {
   nodeId: string;
@@ -27,68 +26,37 @@ export function NodeContent({
   placeholder = "Type something...",
   strikethrough,
 }: NodeContentProps) {
-  const dispatch = useSetAtom(nodeActionAtom)
+  const dispatch = useSetAtom(nodeActionAtom);
   const divRef = useRef<HTMLDivElement>(null);
-  const mentionPopupRef = useRef<MentionPopupHandle>(null);
-  // const linkPopupRef = useRef<MentionPopupHandle>(null);
 
   const nodes = useAtomValue(nodesAtom);
   const [activeNodeId, setActiveNodeId] = useAtom(focusedIdAtom);
 
   // Content ops target the effective node; focus/active uses the structural nodeId
   const contentNodeId = effectiveNodeId ?? nodeId;
-  const [content, setContent] = useState(
-    () => nodes[contentNodeId]?.content ?? "",
-  );
-  const
-  const [mentions, setMentions] = useState<IMention[]>(
-    () => nodes[contentNodeId]?.mentions ?? [],
-  );
-
-
-
-  // const content = useStore((s) => s.nodes[contentNodeId]?.content ?? "");
-  // const nodes = useStore((s) => s.nodes);
-  // const activeNodeId = useStore((s) => s.activeId);
-  // const focusCursorAtEnd = useStore((s) => s.focusCursorAtEnd);
-  // const updateContent = useStore((s) => s.updateContent);
-  // const setActiveNode = useStore((s) => s.setActiveNode);
-  // const setActiveProject = useStore((s) => s.setActiveProject);
-  // const createLinkNode = useStore((s) => s.createLinkNode);
+  const node = nodes[contentNodeId];
+  const [content, setContent] = useState(() => node?.content ?? "");
 
   const { handleKeyDown: handleNodeKeyDown } = useNodeKeyboard({
-    node: nodes[nodeId],
-    index: 0,
-    divRef,
+    nodeId,
     isRootTitle,
+    divRef,
   });
 
   const isActive = activeNodeId === nodeId;
-  // Null sentinel ensures the first render always syncs the DOM,
-  // even if the node mounts with isActive=true (e.g. via mention navigation).
   const prevNodeIdRef = useRef<string | null>(null);
 
-  // Popup states
-  const [mentionState, setMentionState] = useState<{
-    query: string;
-    anchorRect: DOMRect;
-  } | null>(null);
-  // const [linkState, setLinkState] = useState<{
-  //   query: string;
-  //   anchorRect: DOMRect;
-  // } | null>(null);
-
-  // ── Navigate to the node's owning project and focus it ──────────────────────
-  const handleMentionClick = useCallback(
-    (mentionedNodeId: string) => {
-      const root = findRoot(nodes[mentionedNodeId], nodes);
-      if (!root) return;
-      setActiveNodeId(root.id);
-    },
-    [setActiveNodeId],
-  );
-
   // ── DOM ↔ store sync ─────────────────────────────────────────────────────────
+  // Sync content from store to DOM whenever node changes externally
+  useEffect(() => {
+    const externalContent = nodes[contentNodeId]?.content ?? "";
+    if (externalContent !== content) {
+      setContent(externalContent);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nodes[contentNodeId]?.content]);
+
+  // Re-render DOM when content or active state changes
   useEffect(() => {
     const div = divRef.current;
     if (!div) return;
@@ -96,7 +64,7 @@ export function NodeContent({
     prevNodeIdRef.current = nodeId;
     if (!nodeChanged && isActive) return;
     renderToDOM(div, content, nodes, handleMentionClick);
-  }, [nodeId, content, isActive, nodes, handleMentionClick]);
+  }, [nodeId, content, isActive, nodes]);
 
   // ── Focus management ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -107,167 +75,34 @@ export function NodeContent({
     const sel = window.getSelection();
     if (!sel) return;
     const range = document.createRange();
-    // if (focusCursorAtEnd) {
-    //   range.selectNodeContents(div);
-    //   range.collapse(false);
-    // } else {
     range.selectNodeContents(div);
     range.collapse(true);
-    // }
     sel.removeAllRanges();
     sel.addRange(range);
   }, [isActive]);
+
+  // ── Navigate to the node's owning project and focus it ──────────────────────
+  const handleMentionClick = useCallback(
+    (mentionedNodeId: string) => {
+      const root = findRoot(nodes[mentionedNodeId], nodes);
+      if (!root) return;
+      setActiveNodeId(root.id);
+    },
+    [nodes, setActiveNodeId],
+  );
 
   // ── Input handler ────────────────────────────────────────────────────────────
   const handleInput = useCallback(() => {
     const div = divRef.current;
     if (!div) return;
-    const { content: newContent, mentions } = serializeFromDOM(div);
-    // updateContent(contentNodeId, newContent, mentions);
+    const { content: newContent, mentions: newMentions } = serializeFromDOM(div);
     setContent(newContent);
-    setMentions(mentions);
+    dispatch(makeAction.update(contentNodeId, { content: newContent, mentions: newMentions }));
+  }, [contentNodeId, dispatch]);
 
-    // Prefer link trigger over mention trigger (both can't be open simultaneously)
-    // const linkQuery = getLinkQueryAtCursor(div);
-    // if (linkQuery !== null) {
-    //   const sel = window.getSelection();
-    //   const rect = sel?.rangeCount
-    //     ? sel.getRangeAt(0).getBoundingClientRect()
-    //     : new DOMRect();
-    //   // setLinkState((prev) =>
-    //   //   prev
-    //   //     ? { ...prev, query: linkQuery }
-    //   //     : { query: linkQuery, anchorRect: rect },
-    //   // );
-    //   setMentionState(null);
-    //   return;
-    // }
-    // // setLinkState(null);
-
-    // const mentionQuery = getMentionQueryAtCursor(div);
-    // if (mentionQuery !== null) {
-    //   const sel = window.getSelection();
-    //   const rect = sel?.rangeCount
-    //     ? sel.getRangeAt(0).getBoundingClientRect()
-    //     : new DOMRect();
-    //   setMentionState((prev) =>
-    //     prev
-    //       ? { ...prev, query: mentionQuery }
-    //       : { query: mentionQuery, anchorRect: rect },
-    //   );
-    // } else {
-    //   setMentionState(null);
-    // }
-  }, [contentNodeId]);
-
-  // ── Mention insertion ────────────────────────────────────────────────────────
-  // const insertMention = useCallback(
-  //   (selectedNode: INode) => {
-  //     const div = divRef.current;
-  //     if (!div || !mentionState) return;
-  //     const sel = window.getSelection();
-  //     if (!sel || !sel.isCollapsed) return;
-
-  //     const deleteCount = mentionState.query.length + 1; // +1 for '@'
-  //     const range = sel.getRangeAt(0).cloneRange();
-  //     if (range.startOffset < deleteCount) return;
-
-  //     range.setStart(range.startContainer, range.startOffset - deleteCount);
-  //     range.deleteContents();
-
-  //     const span = createMentionSpan(
-  //       selectedNode.id,
-  //       selectedNode.content,
-  //       handleMentionClick,
-  //     );
-  //     range.insertNode(span);
-
-  //     const space = document.createTextNode("\u00a0");
-  //     if (span.nextSibling) {
-  //       div.insertBefore(space, span.nextSibling);
-  //     } else {
-  //       div.appendChild(space);
-  //     }
-
-  //     const newRange = document.createRange();
-  //     newRange.setStartAfter(space);
-  //     newRange.collapse(true);
-  //     sel.removeAllRanges();
-  //     sel.addRange(newRange);
-
-  //     const { content: newContent, mentions } = serializeFromDOM(div);
-  //     updateContent(contentNodeId, newContent, mentions);
-  //     setMentionState(null);
-  //   },
-  //   [mentionState, contentNodeId, updateContent, handleMentionClick],
-  // );
-
-  // // ── Link node creation ───────────────────────────────────────────────────────
-  // const insertLinkNode = useCallback(
-  //   (selectedNode: INode) => {
-  //     const div = divRef.current;
-  //     if (!div || !linkState) return;
-  //     const sel = window.getSelection();
-  //     if (!sel || !sel.isCollapsed) return;
-
-  //     const deleteCount = linkState.query.length + 2; // +2 for '[['
-  //     const range = sel.getRangeAt(0).cloneRange();
-  //     if (range.startOffset < deleteCount) return;
-
-  //     // Delete '[[query' from the current node's text
-  //     range.setStart(range.startContainer, range.startOffset - deleteCount);
-  //     range.deleteContents();
-
-  //     // Update the current node's content (without the [[query text)
-  //     const { content: newContent, mentions } = serializeFromDOM(div);
-  //     updateContent(contentNodeId, newContent, mentions);
-
-  //     // Create the linked node as the next sibling of the structural nodeId
-  //     const newLinkId = createLinkNode(selectedNode.id, nodeId);
-  //     setActiveNode(newLinkId, false);
-  //     setLinkState(null);
-  //   },
-  //   [
-  //     linkState,
-  //     contentNodeId,
-  //     nodeId,
-  //     updateContent,
-  //     createLinkNode,
-  //     setActiveNode,
-  //   ],
-  // );
-
-  // ── Keyboard: intercept popup nav before node shortcuts ─────────────────────
+  // ── Keyboard: node shortcuts ─────────────────────────────────────────────────
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLDivElement>) => {
-      // const activePopup = mentionState
-      //   ? mentionPopupRef
-      //   : linkState
-      //     ? linkPopupRef
-      //     : null;
-      // if (activePopup) {
-      //   if (e.key === "ArrowDown") {
-      //     e.preventDefault();
-      //     activePopup.current?.moveDown();
-      //     return;
-      //   }
-      //   if (e.key === "ArrowUp") {
-      //     e.preventDefault();
-      //     activePopup.current?.moveUp();
-      //     return;
-      //   }
-      //   if (e.key === "Enter") {
-      //     e.preventDefault();
-      //     activePopup.current?.selectCurrent();
-      //     return;
-      //   }
-      //   if (e.key === "Escape") {
-      //     e.preventDefault();
-      //     setMentionState(null);
-      //     setLinkState(null);
-      //     return;
-      //   }
-      // }
       handleNodeKeyDown(e);
     },
     [handleNodeKeyDown],
@@ -276,38 +111,16 @@ export function NodeContent({
   const handleFocus = () => setActiveNodeId(nodeId);
 
   return (
-    <>
-      <div
-        ref={divRef}
-        className={clsx(styles.editor, strikethrough && styles.strikethrough)}
-        contentEditable
-        // suppressContentEditableWarning
-        data-node-id={nodeId}
-        data-placeholder={placeholder}
-        onInput={handleInput}
-        onKeyDown={handleKeyDown}
-        onFocus={handleFocus}
-      />
-      {/* {mentionState && (
-        <MentionPopup
-          ref={mentionPopupRef}
-          query={mentionState.query}
-          anchorRect={mentionState.anchorRect}
-          excludeNodeId={contentNodeId}
-          onSelect={insertMention}
-          onClose={() => setMentionState(null)}
-        />
-      )} */}
-      {/* {linkState && (
-        <MentionPopup
-          ref={linkPopupRef}
-          query={linkState.query}
-          anchorRect={linkState.anchorRect}
-          excludeNodeId={nodeId}
-          onSelect={insertLinkNode}
-          onClose={() => setLinkState(null)}
-        />
-      )} */}
-    </>
+    <div
+      ref={divRef}
+      className={clsx(styles.editor, strikethrough && styles.strikethrough)}
+      contentEditable
+      suppressContentEditableWarning
+      data-node-id={nodeId}
+      data-placeholder={placeholder}
+      onInput={handleInput}
+      onKeyDown={handleKeyDown}
+      onFocus={handleFocus}
+    />
   );
 }

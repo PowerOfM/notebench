@@ -1,25 +1,22 @@
 import styles from "./NodeItem.module.css";
 
 interface NodeItemBrokenProps {
-  nodeId: string;
   depth: number;
+  onUnlink: () => void;
+  onDelete: () => void;
 }
 
-export function NodeItemBroken({ nodeId, depth }: NodeItemBrokenProps) {
+export function NodeItemBroken({ depth, onUnlink, onDelete }: NodeItemBrokenProps) {
+  const cssVars = { "--depth": depth } as React.CSSProperties;
+
   return (
     <div
-      ref={setNodeRef}
       role="treeitem"
       aria-level={depth + 1}
-      className={clsx(styles.row, styles.brokenRow)}
+      className={styles.row}
       style={cssVars}
-      {...attributes}
     >
-      <div
-        className={styles.dragHandle}
-        {...listeners}
-        aria-label="Drag to reorder"
-      />
+      <div className={styles.dragHandle} aria-label="Drag to reorder" />
       <div className={styles.gutter}>
         <span className={styles.linkIcon} aria-hidden="true">
           ⛓
@@ -29,14 +26,14 @@ export function NodeItemBroken({ nodeId, depth }: NodeItemBrokenProps) {
       <div className={styles.brokenActions}>
         <button
           className={styles.brokenBtn}
-          onMouseDown={handleUnlink}
+          onMouseDown={onUnlink}
           aria-label="Unlink broken node"
         >
           Unlink
         </button>
         <button
           className={styles.brokenBtn}
-          onMouseDown={handleDelete}
+          onMouseDown={onDelete}
           aria-label="Delete broken node"
         >
           Delete

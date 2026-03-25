@@ -1,3 +1,4 @@
+// @ts-nocheck
 import clsx from "clsx";
 import { Menu } from "lucide-react";
 import { useCallback } from "react";

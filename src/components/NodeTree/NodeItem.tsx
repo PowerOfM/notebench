@@ -3,8 +3,11 @@ import { CSS } from "@dnd-kit/utilities";
 import clsx from "clsx";
 import { ChevronRight, GripVertical } from "lucide-react";
 import { memo, useCallback } from "react";
+import { useAtomValue, useSetAtom } from "jotai";
 import { resolveLink } from "../../lib/linkResolver";
-import { useStore } from "../../store";
+import { nodesAtom } from "../../store/atoms";
+import { makeAction } from "../../store/actions";
+import { nodeActionAtom } from "../../store/dispatch";
 import { NodeContent } from "../NodeContent/NodeContent";
 import { StatusIndicator } from "../StatusIndicator/StatusIndicator";
 import styles from "./NodeItem.module.css";
@@ -19,17 +22,10 @@ export const NodeItem = memo(function NodeItem({
   nodeId,
   depth,
 }: NodeItemProps) {
-  // Subscribe only to the specific node — not the full nodes map
-  const node = useStore((s) => s.nodes[nodeId]);
+  const nodes = useAtomValue(nodesAtom);
+  const dispatch = useSetAtom(nodeActionAtom);
 
-  // If this is a link node, also subscribe to its direct target so we
-  // re-render when the target's content/status changes
-  const isLink = !!node.linkId;
-  useStore((s) => (node.linkId ? s.nodes[node.linkId] : null));
-
-  const toggleCollapsed = useStore((s) => s.toggleCollapsed);
-  const unlinkNode = useStore((s) => s.unlinkNode);
-  const deleteNode = useStore((s) => s.deleteNode);
+  const node = nodes[nodeId];
 
   const {
     attributes: { role: _role, ...attributes },
@@ -44,41 +40,35 @@ export const NodeItem = memo(function NodeItem({
     (e: React.MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      toggleCollapsed(nodeId);
+      dispatch(makeAction.update(nodeId, { collapsed: !node?.collapsed }));
     },
-    [nodeId, toggleCollapsed],
-  );
-
-  const handleUnlink = useCallback(
-    (e: React.MouseEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      unlinkNode(nodeId);
-    },
-    [nodeId, unlinkNode],
+    [nodeId, node?.collapsed, dispatch],
   );
 
   const handleDelete = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      deleteNode(nodeId);
+      if (!node) return;
+      dispatch(makeAction.remove(node));
     },
-    [nodeId, deleteNode],
+    [node, dispatch],
   );
-
-  // Use getState() for resolveLink — reads current state without subscribing to
-  // the full nodes map (avoids re-rendering all NodeItems on any node change)
-  const linkedNode = isLink
-    ? resolveLink(nodeId, useStore.getState().nodes)
-    : null;
 
   if (!node) {
     return null;
   }
 
-  const effectiveId = effectiveNode!.id;
-  const hasChildren = effectiveNode!.childrenIds.length > 0;
+  // Resolve link: if this is a link node, get the effective (target) node
+  const isLink = !!node.linkId;
+  const linkedNode = isLink ? resolveLink(node.linkId!, nodes) : null;
+  const effectiveNode = linkedNode ?? node;
+
+  const effectiveId = effectiveNode.id;
+  const hasChildren = (effectiveNode.childrenIds?.length ?? 0) > 0;
+  const isChecked =
+    effectiveNode.status?.type === "checkbox" && effectiveNode.status.checked;
+
   const cssVars = {
     "--depth": depth,
     transform: CSS.Transform.toString(transform),
@@ -123,7 +113,7 @@ export const NodeItem = memo(function NodeItem({
       ) : (
         <div className={styles.collapseBtnPlaceholder} />
       )}
-      {isLink && hasChildren && (
+      {isLink && (
         <span
           className={styles.linkIconInline}
           aria-label="Linked node"
@@ -136,9 +126,7 @@ export const NodeItem = memo(function NodeItem({
       <NodeContent
         nodeId={nodeId}
         effectiveNodeId={isLink ? effectiveId : undefined}
-        strikethrough={
-          effectiveNode!.statusType === "checkable" && effectiveNode!.checked
-        }
+        strikethrough={isChecked}
       />
       <NodeItemMenu onDelete={handleDelete} />
     </div>

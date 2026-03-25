@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Sidebar } from "./components/Layout/Sidebar";
 import { NodeView } from "./components/NodeView/NodeView";
+import { usePersistence } from "./hooks/usePersistence";
+import { useUndoRedo } from "./hooks/useUndoRedo";
 
 function SingleNodeLayout() {
   const [rootId, setRootId] = useState<string | null>(null);
@@ -13,8 +15,8 @@ function SingleNodeLayout() {
 }
 
 function App() {
-  // usePersistence();
-  // useUndoRedo();
+  usePersistence();
+  useUndoRedo();
   return <SingleNodeLayout />;
 }
 

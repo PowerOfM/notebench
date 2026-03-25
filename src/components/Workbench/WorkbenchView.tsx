@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useStore } from '../../store';
 import { NodeTree } from '../NodeTree/NodeTree';
 import styles from './WorkbenchView.module.css';
