@@ -4,10 +4,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useNodeKeyboard } from "../../hooks/useNodeKeyboard";
 import { renderToDOM, serializeFromDOM } from "../../lib/contentParser";
 import { findRoot } from "../../lib/tree";
-import { activeNodeIdAtom, nodesAtom } from "../../store/atoms";
+import { focusedIdAtom, nodesAtom } from "../../store/atoms";
 import type { IMention } from "../../types/node";
 import { type MentionPopupHandle } from "../MentionPopup/MentionPopup";
 import styles from "./NodeContent.module.css";
+import { useSetAtom } from "jotai/ts3.8/esm/react";
+import { nodeActionAtom } from "../../store/actions";
 
 interface NodeContentProps {
   nodeId: string;
@@ -25,21 +27,25 @@ export function NodeContent({
   placeholder = "Type something...",
   strikethrough,
 }: NodeContentProps) {
+  const dispatch = useSetAtom(nodeActionAtom)
   const divRef = useRef<HTMLDivElement>(null);
   const mentionPopupRef = useRef<MentionPopupHandle>(null);
   // const linkPopupRef = useRef<MentionPopupHandle>(null);
 
   const nodes = useAtomValue(nodesAtom);
-  const [activeNodeId, setActiveNodeId] = useAtom(activeNodeIdAtom);
+  const [activeNodeId, setActiveNodeId] = useAtom(focusedIdAtom);
 
   // Content ops target the effective node; focus/active uses the structural nodeId
   const contentNodeId = effectiveNodeId ?? nodeId;
   const [content, setContent] = useState(
     () => nodes[contentNodeId]?.content ?? "",
   );
+  const
   const [mentions, setMentions] = useState<IMention[]>(
     () => nodes[contentNodeId]?.mentions ?? [],
   );
+
+
 
   // const content = useStore((s) => s.nodes[contentNodeId]?.content ?? "");
   // const nodes = useStore((s) => s.nodes);

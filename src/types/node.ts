@@ -36,7 +36,7 @@ export interface INode {
 }
 
 export type INodeChanges = Partial<
-  Omit<INode, "id" | "createdAt" | "updatedAt">
+  Omit<INode, "id" | "parentId" | "createdAt" | "updatedAt">
 >;
 
 export type INodeMap = Record<string, INode>;

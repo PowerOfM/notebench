@@ -1,10 +1,9 @@
 import type { INode, INodeChanges } from "./node";
 
-export interface INodeCreateAction {
-  type: "create";
-  parentId: string | null;
+export interface INodeAddAction {
+  type: "add";
+  node: INode;
   index?: number;
-  payload: INodeChanges;
   autoFocus?: boolean;
 }
 
@@ -23,18 +22,23 @@ export interface INodeMoveAction {
 
 export interface INodeRemoveAction {
   type: "remove";
-  nodeId: string;
-  payload: INode;
-}
-
-export interface INodeFocusAction {
-  type: "focus";
-  nodeId: string;
+  node: INode;
 }
 
 export type INodeAction =
-  | INodeCreateAction
+  | INodeAddAction
   | INodeUpdateAction
   | INodeMoveAction
-  | INodeRemoveAction
-  | INodeFocusAction;
+  | INodeRemoveAction;
+
+export interface IDispatchEvent {
+  action: INodeAction | null;
+  focus: string | null;
+  isUndo?: boolean;
+}
+
+export interface IDispatchEventGeneric<ActionType> {
+  action: ActionType;
+  focus: string | null;
+  isUndo?: boolean;
+}

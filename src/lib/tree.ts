@@ -15,11 +15,14 @@ export interface DragProjection {
   index: number;
 }
 
-export function createNode(input: INodeChanges = {}): INode {
+export function createNode(
+  parentId: string | null,
+  input: INodeChanges = {},
+): INode {
   return {
     ...input,
     id: generateId(),
-    parentId: input.parentId ?? null,
+    parentId: parentId ?? null,
     content: "",
     createdAt: Date.now(),
     updatedAt: Date.now(),
@@ -110,7 +113,7 @@ export function getProjection(
  */
 export function flattenVisible(
   ids: string[],
-  nodes: NodeMap,
+  nodes: INodeMap,
   depth = 0,
 ): FlatNode[] {
   const result: FlatNode[] = [];

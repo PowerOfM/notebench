@@ -1,8 +1,9 @@
 import clsx from "clsx";
-import { useAtomValue } from "jotai";
+import { useAtomValue, useSetAtom } from "jotai";
 import { useState } from "react";
 import { nodesAtom, pinnedIdsAtom } from "../../store/atoms";
 import styles from "./Sidebar.module.css";
+import { makeAction, nodeActionAtom } from "../../store/actions";
 
 /** Close the sidebar on narrow screens after a navigation action. */
 // function useCloseSidebarOnMobile() {
@@ -14,18 +15,23 @@ import styles from "./Sidebar.module.css";
 //   }, [setSidebarCollapsed]);
 // }
 
-export function Sidebar() {
+interface IProps {
+  activeId: string | null;
+  onSelectId: (value: string | null) => void;
+}
+
+export function Sidebar({ activeId, onSelectId }: IProps) {
+  const dispatch = useSetAtom(nodeActionAtom);
   const [activeView, setActiveView] = useState<"project" | "workbench">(
     "project",
   );
   const nodes = useAtomValue(nodesAtom);
   const pinnedIds = useAtomValue(pinnedIdsAtom);
 
-  // const handleAddProject = useCallback(() => {
-  //   db.createNode({
-  //     isPinned: 1,
-  //   });
-  // }, []);
+  const handleAddProject = () => dispatch(makeAction.create(null));
+
+  console.log("nodes", nodes);
+  console.log("pinnedIds", pinnedIds);
 
   // const handleTodayClick = useCallback(() => {
   //   const todayNode = Object.values(nodes).find(
@@ -85,14 +91,14 @@ export function Sidebar() {
       {/* Projects section */}
       <div className={styles.header}>
         <span className={styles.title}>Projects</span>
-        {/* <button
+        <button
           className={styles.addBtn}
           onClick={handleAddProject}
           title="New project"
           aria-label="New project"
         >
           +
-        </button> */}
+        </button>
       </div>
       <div className={styles.list}>
         {pinnedIds.length === 0 && (
@@ -100,14 +106,14 @@ export function Sidebar() {
         )}
         {pinnedIds.map((id) => {
           const node = nodes[id];
+          if (!node) return null;
+
           return (
             <div
               key={id}
-              className={clsx(
-                styles.item,
-                activeView === "project" && styles.active,
-              )}
+              className={clsx(styles.item, activeId === id && styles.active)}
               onClick={() => {
+                onSelectId(id);
                 // setActiveProject(node.id);
                 // closeSidebar();
               }}
