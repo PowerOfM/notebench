@@ -1,13 +1,13 @@
+import { useSetAtom } from 'jotai';
 import { useEffect } from 'react';
-import { useStore } from '../store';
+import { undoAtom } from '../store/actions';
 
 /**
- * Registers global Cmd/Ctrl+Z (undo) and Cmd/Ctrl+Shift+Z / Cmd/Ctrl+Y (redo)
- * keyboard shortcuts. Attach once at the app root.
+ * Registers global Cmd/Ctrl+Z (undo) keyboard shortcut.
+ * Attach once at the app root.
  */
 export function useUndoRedo() {
-  const undo = useStore((s) => s.undo);
-  const redo = useStore((s) => s.redo);
+  const undo = useSetAtom(undoAtom);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -17,13 +17,10 @@ export function useUndoRedo() {
       if (e.key === 'z' && !e.shiftKey) {
         e.preventDefault();
         undo();
-      } else if ((e.key === 'z' && e.shiftKey) || e.key === 'y') {
-        e.preventDefault();
-        redo();
       }
     }
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [undo, redo]);
+  }, [undo]);
 }

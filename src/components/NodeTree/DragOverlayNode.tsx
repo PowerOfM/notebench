@@ -1,5 +1,6 @@
+import { useAtomValue } from "jotai";
 import { resolveLink } from "../../lib/linkResolver";
-import { useStore } from "../../store";
+import { nodesAtom } from "../../store/atoms";
 import styles from "./DragOverlayNode.module.css";
 
 interface DragOverlayNodeProps {
@@ -8,8 +9,8 @@ interface DragOverlayNodeProps {
 }
 
 export function DragOverlayNode({ nodeId, depth }: DragOverlayNodeProps) {
-  const node = useStore((s) => s.nodes[nodeId]);
-  const nodes = useStore((s) => s.nodes);
+  const nodes = useAtomValue(nodesAtom);
+  const node = nodes[nodeId];
 
   if (!node) return null;
 

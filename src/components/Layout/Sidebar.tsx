@@ -1,98 +1,49 @@
 import clsx from "clsx";
-import { useAtomValue } from "jotai";
-import { useState } from "react";
-import { nodesAtom, pinnedIdsAtom } from "../../store/atoms";
+import { useAtomValue, useSetAtom } from "jotai";
+import { nodesAtom, pinnedIdsAtom, activeParentIdAtom } from "../../store/atoms";
+import { nodeActionAtom, makeAction } from "../../store/actions";
 import styles from "./Sidebar.module.css";
 
-/** Close the sidebar on narrow screens after a navigation action. */
-// function useCloseSidebarOnMobile() {
-//   const setSidebarCollapsed = useStore((s) => s.setSidebarCollapsed);
-//   return useCallback(() => {
-//     if (window.matchMedia("(max-width: 768px)").matches) {
-//       setSidebarCollapsed(true);
-//     }
-//   }, [setSidebarCollapsed]);
-// }
-
 export function Sidebar() {
-  const [activeView, setActiveView] = useState<"project" | "workbench">(
-    "project",
-  );
   const nodes = useAtomValue(nodesAtom);
   const pinnedIds = useAtomValue(pinnedIdsAtom);
+  const activeParentId = useAtomValue(activeParentIdAtom);
+  const setActiveParentId = useSetAtom(activeParentIdAtom);
+  const dispatch = useSetAtom(nodeActionAtom);
 
-  // const handleAddProject = useCallback(() => {
-  //   db.createNode({
-  //     isPinned: 1,
-  //   });
-  // }, []);
-
-  // const handleTodayClick = useCallback(() => {
-  //   const todayNode = Object.values(nodes).find(
-  //     (n) => n.isDaily && n.dailyDate === todayDate,
-  //   );
-  //   if (todayNode) {
-  //     setActiveProject(todayNode.id);
-  //   } else {
-  //     const id = createDailyNode(todayDate);
-  //     setActiveProject(id);
-  //   }
-  //   closeSidebar();
-  // }, [nodes, todayDate, createDailyNode, setActiveProject, closeSidebar]);
-
-  // const rootNodes = rootIds.map((id) => nodes[id]).filter(Boolean);
-  // const projectNodes = rootNodes.filter((n) => !n.isDaily);
-  // const dailyNodes = rootNodes
-  //   .filter((n) => n.isDaily)
-  //   .sort((a, b) => (b.dailyDate ?? "").localeCompare(a.dailyDate ?? ""));
-  // const pastDailyNodes = dailyNodes.filter((n) => n.dailyDate !== todayDate);
-
-  // const isTodayActive =
-  //   activeView === "project" &&
-  //   nodes[activeProjectId ?? ""]?.dailyDate === todayDate;
+  const handleAddProject = () => {
+    dispatch(makeAction.create(null, undefined, { isPinned: 1 }, true));
+  };
 
   return (
     <aside className={styles.sidebar}>
       {/* View switcher */}
       <div className={styles.viewSwitcher}>
         <button
-          className={`${styles.viewBtn} ${activeView === "project" ? styles.viewBtnActive : ""}`}
-          // onClick={() => {}}
+          className={`${styles.viewBtn} ${styles.viewBtnActive}`}
           title="Project view"
         >
           Projects
         </button>
         <button
-          className={`${styles.viewBtn} ${activeView === "workbench" ? styles.viewBtnActive : ""}`}
-          // onClick={() => setActiveView("workbench")}
+          className={styles.viewBtn}
           title="Workbench overview"
         >
           Workbench
         </button>
       </div>
 
-      {/* Today button */}
-      {/* <div className={styles.todaySection}>
-        <button
-          className={`${styles.todayBtn} ${isTodayActive ? styles.todayBtnActive : ""}`}
-          onClick={handleTodayClick}
-        >
-          <span className={styles.todayIcon}>📅</span>
-          Today
-        </button>
-      </div> */}
-
       {/* Projects section */}
       <div className={styles.header}>
         <span className={styles.title}>Projects</span>
-        {/* <button
+        <button
           className={styles.addBtn}
           onClick={handleAddProject}
           title="New project"
           aria-label="New project"
         >
           +
-        </button> */}
+        </button>
       </div>
       <div className={styles.list}>
         {pinnedIds.length === 0 && (
@@ -100,25 +51,22 @@ export function Sidebar() {
         )}
         {pinnedIds.map((id) => {
           const node = nodes[id];
+          if (!node) return null;
           return (
             <div
               key={id}
               className={clsx(
                 styles.item,
-                activeView === "project" && styles.active,
+                activeParentId === id && styles.active,
               )}
-              onClick={() => {
-                // setActiveProject(node.id);
-                // closeSidebar();
-              }}
+              onClick={() => setActiveParentId(node.id)}
               role="button"
               tabIndex={0}
-              // onKeyDown={(e) => {
-              //   if (e.key === "Enter" || e.key === " ") {
-              //     setActiveProject(node.id);
-              //     closeSidebar();
-              //   }
-              // }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  setActiveParentId(node.id);
+                }
+              }}
             >
               <span className={styles.itemIcon}>◈</span>
               <span className={styles.itemLabel}>
@@ -129,45 +77,10 @@ export function Sidebar() {
         })}
       </div>
 
-      {/* Past daily notes section */}
-      {/* {pastDailyNodes.length > 0 && (
-        <>
-          <div className={styles.header}>
-            <span className={styles.title}>Daily Notes</span>
-          </div>
-          <div className={styles.list}>
-            {pastDailyNodes.slice(0, 7).map((node) => (
-              <div
-                key={node.id}
-                className={`${styles.item} ${activeProjectId === node.id && activeView === "project" ? styles.active : ""}`}
-                onClick={() => {
-                  setActiveProject(node.id);
-                  closeSidebar();
-                }}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    setActiveProject(node.id);
-                    closeSidebar();
-                  }
-                }}
-              >
-                <span className={styles.itemIcon}>◷</span>
-                <span className={styles.itemLabel}>
-                  {node.dailyDate ?? node.content}
-                </span>
-              </div>
-            ))}
-          </div>
-        </>
-      )} */}
-
       {/* Footer */}
       <div className={styles.footer}>
         <button
           className={styles.settingsBtn}
-          // onClick={() => setSettingsPanelOpen(true)}
           title="Settings"
           aria-label="Open settings"
         >

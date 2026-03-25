@@ -397,7 +397,37 @@ export const nodeActionAtom = atom(null, (get, set, action: INodeAction) => {
   }
 });
 
-export const readNodeAtom = atom((get, nodeId: string) => {
+export const undoAtom = atom(null, (get, set) => {
+  const stack = get(undoStackAtom);
+  if (stack.length === 0) return;
+  const action = stack[stack.length - 1];
+  set(undoStackAtom, stack.slice(0, -1));
+  // Re-apply the inverse action (which was pushed as the undo entry)
   const nodes = get(nodesAtom);
-  return nodes[nodeId];
+  switch (action.type) {
+    case "create":
+      createNodeEffect(get, set, nodes, action);
+      break;
+    case "update":
+      updateNodeEffect(get, set, nodes, action);
+      break;
+    case "remove":
+      removeNodeEffect(get, set, nodes, action);
+      break;
+    case "move": {
+      const node = nodes[action.nodeId];
+      if (!node) return;
+      if (node.parentId == null && action.parentId == null) {
+        moveWithinPinnedEffect(get, set, node.id, action.index);
+      } else if (node.parentId === action.parentId) {
+        moveWithinParentEffect(get, set, nodes, action);
+      } else {
+        moveNodeEffect(get, set, nodes, action);
+      }
+      break;
+    }
+    case "focus":
+      set(activeNodeIdAtom, action.nodeId);
+      break;
+  }
 });

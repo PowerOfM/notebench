@@ -1,12 +1,11 @@
 import clsx from "clsx";
-import { useAtom, useAtomValue } from "jotai";
+import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNodeKeyboard } from "../../hooks/useNodeKeyboard";
 import { renderToDOM, serializeFromDOM } from "../../lib/contentParser";
 import { findRoot } from "../../lib/tree";
+import { makeAction, nodeActionAtom } from "../../store/actions";
 import { activeNodeIdAtom, nodesAtom } from "../../store/atoms";
-import type { IMention } from "../../types/node";
-import { type MentionPopupHandle } from "../MentionPopup/MentionPopup";
 import styles from "./NodeContent.module.css";
 
 interface NodeContentProps {
@@ -26,29 +25,17 @@ export function NodeContent({
   strikethrough,
 }: NodeContentProps) {
   const divRef = useRef<HTMLDivElement>(null);
-  const mentionPopupRef = useRef<MentionPopupHandle>(null);
   // const linkPopupRef = useRef<MentionPopupHandle>(null);
 
   const nodes = useAtomValue(nodesAtom);
   const [activeNodeId, setActiveNodeId] = useAtom(activeNodeIdAtom);
+  const dispatch = useSetAtom(nodeActionAtom);
 
   // Content ops target the effective node; focus/active uses the structural nodeId
   const contentNodeId = effectiveNodeId ?? nodeId;
   const [content, setContent] = useState(
     () => nodes[contentNodeId]?.content ?? "",
   );
-  const [mentions, setMentions] = useState<IMention[]>(
-    () => nodes[contentNodeId]?.mentions ?? [],
-  );
-
-  // const content = useStore((s) => s.nodes[contentNodeId]?.content ?? "");
-  // const nodes = useStore((s) => s.nodes);
-  // const activeNodeId = useStore((s) => s.activeId);
-  // const focusCursorAtEnd = useStore((s) => s.focusCursorAtEnd);
-  // const updateContent = useStore((s) => s.updateContent);
-  // const setActiveNode = useStore((s) => s.setActiveNode);
-  // const setActiveProject = useStore((s) => s.setActiveProject);
-  // const createLinkNode = useStore((s) => s.createLinkNode);
 
   const { handleKeyDown: handleNodeKeyDown } = useNodeKeyboard({
     node: nodes[nodeId],
@@ -62,11 +49,6 @@ export function NodeContent({
   // even if the node mounts with isActive=true (e.g. via mention navigation).
   const prevNodeIdRef = useRef<string | null>(null);
 
-  // Popup states
-  const [mentionState, setMentionState] = useState<{
-    query: string;
-    anchorRect: DOMRect;
-  } | null>(null);
   // const [linkState, setLinkState] = useState<{
   //   query: string;
   //   anchorRect: DOMRect;
@@ -79,7 +61,7 @@ export function NodeContent({
       if (!root) return;
       setActiveNodeId(root.id);
     },
-    [setActiveNodeId],
+    [nodes, setActiveNodeId],
   );
 
   // ── DOM ↔ store sync ─────────────────────────────────────────────────────────
@@ -117,9 +99,8 @@ export function NodeContent({
     const div = divRef.current;
     if (!div) return;
     const { content: newContent, mentions } = serializeFromDOM(div);
-    // updateContent(contentNodeId, newContent, mentions);
+    dispatch(makeAction.update(contentNodeId, { content: newContent, mentions }));
     setContent(newContent);
-    setMentions(mentions);
 
     // Prefer link trigger over mention trigger (both can't be open simultaneously)
     // const linkQuery = getLinkQueryAtCursor(div);
@@ -133,7 +114,6 @@ export function NodeContent({
     //   //     ? { ...prev, query: linkQuery }
     //   //     : { query: linkQuery, anchorRect: rect },
     //   // );
-    //   setMentionState(null);
     //   return;
     // }
     // // setLinkState(null);
@@ -152,7 +132,7 @@ export function NodeContent({
     // } else {
     //   setMentionState(null);
     // }
-  }, [contentNodeId]);
+  }, [contentNodeId, dispatch]);
 
   // ── Mention insertion ────────────────────────────────────────────────────────
   // const insertMention = useCallback(
@@ -190,10 +170,10 @@ export function NodeContent({
   //     sel.addRange(newRange);
 
   //     const { content: newContent, mentions } = serializeFromDOM(div);
-  //     updateContent(contentNodeId, newContent, mentions);
+  //     dispatch(makeAction.update(contentNodeId, { content: newContent, mentions }));
   //     setMentionState(null);
   //   },
-  //   [mentionState, contentNodeId, updateContent, handleMentionClick],
+  //   [mentionState, contentNodeId, dispatch, handleMentionClick],
   // );
 
   // // ── Link node creation ───────────────────────────────────────────────────────
@@ -214,7 +194,7 @@ export function NodeContent({
 
   //     // Update the current node's content (without the [[query text)
   //     const { content: newContent, mentions } = serializeFromDOM(div);
-  //     updateContent(contentNodeId, newContent, mentions);
+  //     dispatch(makeAction.update(contentNodeId, { content: newContent, mentions }));
 
   //     // Create the linked node as the next sibling of the structural nodeId
   //     const newLinkId = createLinkNode(selectedNode.id, nodeId);
@@ -225,7 +205,7 @@ export function NodeContent({
   //     linkState,
   //     contentNodeId,
   //     nodeId,
-  //     updateContent,
+  //     dispatch,
   //     createLinkNode,
   //     setActiveNode,
   //   ],

@@ -1,11 +1,35 @@
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import clsx from "clsx";
 import styles from "./NodeItem.module.css";
 
 interface NodeItemBrokenProps {
   nodeId: string;
   depth: number;
+  onUnlink: (e: React.MouseEvent) => void;
+  onDelete: (e: React.MouseEvent) => void;
 }
 
-export function NodeItemBroken({ nodeId, depth }: NodeItemBrokenProps) {
+export function NodeItemBroken({
+  nodeId,
+  depth,
+  onUnlink,
+  onDelete,
+}: NodeItemBrokenProps) {
+  const {
+    attributes: { role: _role, ...attributes },
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+  } = useSortable({ id: nodeId });
+
+  const cssVars = {
+    "--depth": depth,
+    transform: CSS.Transform.toString(transform),
+    transition,
+  } as React.CSSProperties;
+
   return (
     <div
       ref={setNodeRef}
@@ -29,14 +53,14 @@ export function NodeItemBroken({ nodeId, depth }: NodeItemBrokenProps) {
       <div className={styles.brokenActions}>
         <button
           className={styles.brokenBtn}
-          onMouseDown={handleUnlink}
+          onMouseDown={onUnlink}
           aria-label="Unlink broken node"
         >
           Unlink
         </button>
         <button
           className={styles.brokenBtn}
-          onMouseDown={handleDelete}
+          onMouseDown={onDelete}
           aria-label="Delete broken node"
         >
           Delete

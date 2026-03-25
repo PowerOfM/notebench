@@ -1,4 +1,7 @@
+import { useAtomValue } from "jotai";
+import { nodesAtom } from "../../store/atoms";
 import { NodeContent } from "../NodeContent/NodeContent";
+import { NodeTree } from "../NodeTree/NodeTree";
 import styles from "./NodeView.module.css";
 
 interface IProps {
@@ -6,13 +9,9 @@ interface IProps {
 }
 
 export function NodeView({ rootId }: IProps) {
-  // const nodes = useAtomValue(nodesAtom);
-  // const dispatch = useSetAtom(nodeActionAtom);
-  // const rootNode = nodes[rootId];
-
-  // const handleAddNode = useCallback(() => {
-  //   dispatch(makeAction.create(rootId));
-  // }, [dispatch, rootId]);
+  const nodes = useAtomValue(nodesAtom);
+  const rootNode = nodes[rootId];
+  const childrenIds = rootNode?.childrenIds ?? [];
 
   return (
     <div className={styles.projectView}>
@@ -23,7 +22,9 @@ export function NodeView({ rootId }: IProps) {
           placeholder="Project name..."
         />
       </div>
-      <div className={styles.content}>{/* <NodeTree rootId={rootId} /> */}</div>
+      <div className={styles.content}>
+        <NodeTree rootIds={childrenIds} />
+      </div>
     </div>
   );
 }

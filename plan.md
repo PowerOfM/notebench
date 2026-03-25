@@ -8,7 +8,7 @@ Build "Notebench" — a client-only Workflowy-like outliner web app. Users creat
 
 - **React + Vite + TypeScript**
 - **CSS Modules** for styling
-- **Zustand + Immer** for state management
+- **Jotai** for state management (replacing Zustand)
 - **Plain `contenteditable` divs** for node editing (no TipTap — too heavy)
 - **@dnd-kit** for drag-and-drop reordering/reparenting
 - **fuse.js** for fuzzy search in `@` mentions
@@ -19,345 +19,203 @@ Build "Notebench" — a client-only Workflowy-like outliner web app. Users creat
 ## Data Model
 
 ```typescript
-type StatusType = 'none' | 'checkable' | 'project';
-type ProjectStatus = 'todo' | 'in-progress' | 'done' | 'archived';
-
-// Inline mention marker within content text
-interface MentionRef {
-  nodeId: string;     // referenced node ID
-  offset: number;     // character offset in plain text where mention starts
-  length: number;     // length of the @mention placeholder text
+interface IStatusCheckbox {
+  type: "checkbox";
+  checked: boolean;
 }
 
-interface NodeData {
+interface IStatusProject {
+  type: "project";
+  category: "todo" | "in-progress" | "done" | "archived";
+  label: string;
+}
+
+type IStatus = IStatusCheckbox | IStatusProject;
+
+interface IMention {
+  nodeId: string;
+  offset: number;
+  length: number;
+}
+
+interface INode {
   id: string;
   parentId: string | null;
-  content: string;              // Plain text (mentions stored as @{nodeId} markers)
-  mentions: MentionRef[];       // Parsed mention positions for rendering
-  statusType: StatusType;
-  projectStatus: ProjectStatus | null;
-  checked: boolean;
-  collapsed: boolean;
-  childrenIds: string[];        // ordered
+  content: string;
+  linkId?: string;           // If set, this is a symbolic link to the target node
+  childrenIds?: string[];    // Ordered list of child node IDs
+  mentions?: IMention[];     // Parsed mention positions for rendering
+  status?: IStatus;          // Optional status (checkbox or project)
+  collapsed?: boolean;       // Whether children are hidden
+  isPinned?: number;         // 1 if this is a top-level pinned (project) node
+  isDaily?: number;          // 1 if this is a daily note node
   createdAt: number;
   updatedAt: number;
-  isDaily: boolean;
-  dailyDate: string | null;     // ISO date, e.g. "2026-03-17"
-  linkedNodeId: string | null;  // If set, this node is a symbolic link to the target node
 }
 ```
 
-**Content format**: Plain text with inline mention markers like `@{abc123}`. When rendering, these are parsed and replaced with styled `<span contenteditable="false">` elements showing the linked node's current text.
+**Content format**: Plain text with inline mention markers like `@{nodeId}`. When rendering, these are parsed and replaced with styled `<span contenteditable="false">` elements.
 
-**Flat map storage** (`Record<NodeId, NodeData>` + `rootIds: string[]`) — O(1) lookups, cheap reparenting, DnD-compatible.
+**Flat map storage** (`Record<NodeId, INode>`) — O(1) lookups, cheap reparenting, DnD-compatible.
 
-### Node Linking vs. @ Mentions
+**Root ordering**: `pinnedIdsAtom` tracks the ordered list of root-level project nodes. `dailyIdsAtom` tracks daily notes.
 
-| Feature | `@` Mention | Node Link |
-|---------|-------------|-----------|
-| What it is | Inline text reference inside a node's content | A node that IS a full alias of another node |
-| Appears as | A styled span inside text | A full tree node at a new position |
-| Editing | Read-only span; click navigates | Edits propagate to the target node |
-| Children | N/A | Displays target's children; structural changes (add/remove children) affect the target |
-| Local state | None | Link node has its own `collapsed` state independent of the target |
-| Deletion | Removes the inline span | Removes the link node only; target is unaffected |
-| Visual cue | 🔗 icon + live name | Chain icon prefix on the node bullet |
+## Architecture: Jotai Event-Dispatch Pattern
+
+All state is stored in Jotai atoms. Every user action dispatches a typed action through `nodeActionAtom`. Handlers process actions and update atoms atomically.
+
+### Core Atoms (`store/atoms.ts`)
+
+```typescript
+nodesAtom       // Record<string, INode> — flat node map
+pinnedIdsAtom   // string[] — ordered root project node IDs
+dailyIdsAtom    // string[] — ordered daily note node IDs
+activeNodeIdAtom // string | null — currently focused node
+undoStackAtom   // INodeAction[] — undo history
+redoStackAtom   // INodeAction[] — redo history
+```
+
+### Action Types (`types/actions.ts`)
+
+```typescript
+type INodeAction =
+  | { type: "create"; parentId: string | null; index?: number; payload: INodeChanges; autoFocus?: boolean }
+  | { type: "update"; nodeId: string; payload: INodeChanges }
+  | { type: "move"; nodeId: string; parentId: string | null; index?: number }
+  | { type: "remove"; nodeId: string; payload: INode }
+  | { type: "focus"; nodeId: string }
+```
+
+### Action Factories + Dispatch (`store/actions.ts`)
+
+- `makeAction` — factory helpers to construct typed actions
+- `nodeActionAtom` — write-only Jotai atom; processes actions, updates `nodesAtom` / `pinnedIdsAtom`, pushes inverse actions to `undoStackAtom`
+
+### Usage in Components
+
+```typescript
+const dispatch = useSetAtom(nodeActionAtom);
+dispatch(makeAction.create(parentId, index));
+dispatch(makeAction.update(nodeId, { content: "..." }));
+dispatch(makeAction.focus(nodeId));
+```
+
+### Undo/Redo
+
+Each mutating action pushes its inverse onto the undo stack. Undo pops from the undo stack, re-executes the inverse action, and pushes it to the redo stack. Redo reverses this.
 
 ## Key Architecture Decisions
 
 | Decision | Choice | Why |
 |----------|--------|-----|
+| State mgmt | Jotai atoms + event dispatch | Fine-grained subscriptions, no re-render storms, explicit action trail |
+| Action pattern | Typed actions via `nodeActionAtom` | Every mutation is explicit, auditable, undo-able |
 | Data structure | Flat `Record<id, node>` with parent/children refs | O(1) lookup, cheap mutations, DnD-compatible |
-| State mgmt | Zustand + Immer | Fine-grained selectors per node, no context re-render storms |
-| Text editing | Plain `contenteditable` divs | Zero overhead, instant Enter/Tab, no editor framework mount/unmount. Workflowy uses the same approach |
-| `@` mentions | Custom contenteditable + fuse.js popup | Lightweight: detect `@` keystroke, show popup, insert atomic `<span>` |
-| Node linking | `[[` keystroke + popup → creates a link node | Symbolic-link semantics: full node alias at any tree position |
-| DnD | @dnd-kit/core + sortable | Reparenting via projection, official tree example, lightweight |
-| Persistence | Dexie.js (IndexedDB) | No 5MB limit, async, structured queries, browser-native |
-| Export | dexie-export-import | Native Dexie blob export/import, no WASM needed |
+| Text editing | Plain `contenteditable` divs | Zero overhead, instant Enter/Tab |
+| DnD | @dnd-kit/core + sortable | Reparenting via projection |
+| Persistence | Dexie.js (IndexedDB) | No 5MB limit, async, structured queries |
 
 ## Project Structure
 
 ```
 src/
 ├── main.tsx
-├── App.tsx / App.module.css
+├── App.tsx
 ├── types/
-│   └── node.ts                   # Core types
+│   ├── node.ts           # INode, IStatus, IMention, INodeMap, INodeChanges
+│   └── actions.ts        # INodeAction, INodeCreateAction, etc.
 ├── store/
-│   ├── index.ts                  # Zustand store + exports
-│   ├── slices/
-│   │   ├── treeSlice.ts          # Tree CRUD, indent, outdent, move, status
-│   │   ├── uiSlice.ts           # Selection, focus, sidebar, active view
-│   │   ├── settingsSlice.ts     # Column counts, preferences (persisted)
-│   │   └── dailySlice.ts        # Daily node logic
-│   └── selectors.ts
+│   ├── atoms.ts          # Core Jotai atoms
+│   └── actions.ts        # makeAction factories + nodeActionAtom handler
 ├── lib/
-│   ├── tree.ts                   # Pure tree utilities (flatten, siblings, projection)
-│   ├── db.ts                     # Dexie.js database definition + helpers
-│   ├── exportImport.ts           # dexie-export-import wrapper
-│   ├── contentParser.ts          # Parse/render content with @{id} mention markers
-│   ├── fuzzySearch.ts            # fuse.js wrapper
-│   ├── linkResolver.ts           # Resolve linkedNodeId chains with cycle detection
-│   └── id.ts                     # nanoid wrapper
+│   ├── tree.ts           # Pure tree utilities (flattenVisible, getProjection, etc.)
+│   ├── db.ts             # Dexie.js database
+│   ├── exportImport.ts   # dexie-export-import wrapper
+│   ├── contentParser.ts  # Parse/render content with @{id} mention markers
+│   ├── fuzzySearch.ts    # fuse.js wrapper
+│   ├── linkResolver.ts   # Resolve linkId chains with cycle detection
+│   └── id.ts             # nanoid wrapper
 ├── hooks/
-│   ├── useNodeKeyboard.ts        # Per-node keydown handler (Enter, Tab, Backspace, etc.)
-│   ├── useNodeNavigation.ts      # Arrow-key focus management across nodes
-│   └── usePersistence.ts         # Zustand → Dexie auto-save subscription
+│   ├── useNodeKeyboard.ts  # Per-node keydown handler (Enter, Tab, Backspace, arrows)
+│   └── usePersistence.ts   # Jotai atoms → Dexie auto-save
 ├── components/
-│   ├── Layout/                   # Layout shell + Sidebar
-│   ├── NodeTree/                 # Tree renderer + DnD context + NodeItem
-│   ├── NodeContent/              # contenteditable div + mention rendering
-│   ├── MentionPopup/             # Floating @ search popup
-│   ├── LinkPopup/                # Floating [[ link-creation popup
-│   ├── StatusIndicator/          # Checkbox / project badge
-│   ├── Workbench/                # WorkbenchView, WorkbenchPane, HorizontalScroller
-│   ├── Settings/                 # SettingsPanel (column counts, preferences)
-│   └── ExportDialog/
+│   ├── Layout/             # App shell + Sidebar
+│   ├── NodeView/           # Root view for a single project/daily note
+│   ├── NodeTree/           # DnD tree renderer + NodeItem
+│   ├── NodeContent/        # contenteditable div + mention rendering
+│   ├── StatusIndicator/    # Checkbox / project badge
+│   ├── MentionPopup/       # Floating @ search popup
+│   └── FloatingToolbar/    # Mobile/touch action toolbar
 └── styles/
     ├── global.css
     └── variables.css
 ```
 
-## Component Hierarchy
+## Component Hierarchy (NodeView focus)
 
 ```
 <App>
-  <Layout>
-    <Sidebar>  (project list, daily nodes, export button, view switcher)
-    <MainContent>
-      // View 1: Single project (click a project in sidebar)
-      <ProjectView>
-        <NodeTree>  (DndContext + SortableContext over flattened visible nodes)
-          <NodeItem>  (indent + collapse + StatusIndicator + NodeContent)
-            <NodeContent>  (contenteditable div with inline mention spans)
-
-      // View 2: Workbench (dashboard overview)
-      <WorkbenchView>
-        <WorkbenchPane position="top" label="Projects">
-          <HorizontalScroller count={settings.projectColumns}>
-            <ProjectCard>  (compact NodeTree for one project)
-        <WorkbenchPane position="bottom" label="Daily Notes">
-          <HorizontalScroller count={settings.dailyColumns}>
-            <DailyCard>  (compact NodeTree for one daily note, latest first)
-
-      <SettingsPanel>  (slide-out or modal)
-      <MentionPopup>  (floating, positioned near cursor via portal)
+  <Sidebar>  (project list — reads pinnedIdsAtom + nodesAtom)
+  <NodeView rootId="...">
+    <NodeContent nodeId={rootId} isRootTitle />
+    <NodeTree rootIds={[...childrenIds]}>
+      <NodeItem nodeId="..." depth={n}>
+        <StatusIndicator nodeId="..." />
+        <NodeContent nodeId="..." />
 ```
 
-## Workbench View
+## Node Editing
 
-Split-screen dashboard:
+Each node's text is a `<div contenteditable="true">`. `useNodeKeyboard` handles:
 
-- **Top half**: Horizontally scrolling row of project cards. Each card shows a root project with its child tree (collapsed by default). Card width = `viewport / settings.projectColumns`.
-- **Bottom half**: Same for daily notes, sorted latest-first.
-- **Scrolling**: CSS `overflow-x: auto` + `scroll-snap-type: x mandatory` for card-by-card snapping. Left/right arrows on hover.
-- **Settings**: Slide-out panel with sliders for `projectColumns` (1–4, default 2) and `dailyColumns` (1–4, default 2). Persisted in Dexie `meta` table.
+- **Enter** — create sibling node below (`makeAction.create`)
+- **Tab** — indent (become child of previous sibling via `makeAction.move`)
+- **Shift+Tab** — outdent (become sibling of parent via `makeAction.move`)
+- **Backspace (empty/at-start)** — delete node (`makeAction.remove`)
+- **Arrow Up/Down** — focus previous/next visible node (`makeAction.focus`)
+- **Cmd/Ctrl+Enter** — toggle checkbox status (`makeAction.update`)
 
-## Node Editing (contenteditable)
-
-Each node's text is a `<div contenteditable="true">`. This approach:
-
-- **No mount/unmount cost** — the div is always there, always editable
-- **Instant Enter/Tab** — keydown handlers on the div directly manipulate the store
-- **@mentions as atomic spans** — `<span contenteditable="false" data-mention-id="...">` inside the contenteditable div
-- **Content sync** — on `input` event (debounced), extract text + mention positions from DOM, update store
-
-### Content serialization
-
-```
-Stored:    "Working on @{abc123} next week"
-Rendered:  "Working on [🔗 Design homepage] next week"
-                       ^--- <span contenteditable="false" data-mention-id="abc123">
-```
-
-`contentParser.ts` handles:
-- `serializeFromDOM(div)` → extract plain text with `@{id}` markers
-- `renderToDOM(content, mentions, store)` → build innerHTML with styled mention spans
-
-### Keyboard shortcuts
-
-Handled via `onKeyDown` on each `<div contenteditable>`:
-
-- **Enter** — `preventDefault()`, create sibling node below, focus it
-- **Tab** — indent (become child of previous sibling)
-- **Shift+Tab** — outdent (become sibling of parent)
-- **Backspace at position 0 on empty** — delete node, focus previous
-- **Arrow Up** (cursor at start) — focus previous visible node (cursor at end)
-- **Arrow Down** (cursor at end) — focus next visible node (cursor at start)
-- **Cmd/Ctrl+Enter** — toggle checkbox / cycle project status
-- **`@`** — open MentionPopup at cursor position
-- **`[[`** — open LinkPopup; on selection, create a new linked node as the next sibling
-
-### Focus management
-
-Store tracks `activeNodeId`. When it changes, the corresponding `NodeContent` component calls `divRef.current.focus()` + sets cursor position via `Selection` API. Unidirectional: keyboard handler → store action → state change → useEffect → DOM focus.
-
-## @ Mentions
-
-1. User types `@` in any node's contenteditable
-2. `MentionPopup` renders as a floating portal, positioned via `window.getSelection().getRangeAt(0).getBoundingClientRect()`
-3. Popup shows fuse.js fuzzy search results against all node text content
-4. Arrow keys navigate the list, Enter selects
-5. On selection: insert `<span contenteditable="false" data-mention-id="nodeId">` at cursor position, remove the `@query` text
-6. Mention spans render with a link icon + live text from the referenced node (via Zustand selector)
-7. Clicking a mention span navigates to that node
-
-### Mention span rendering
-
-The `NodeContent` component subscribes to referenced node data. When a linked node's text or status changes, the mention span updates automatically. Checked items show strikethrough, project items show their status color.
+Content changes dispatch `makeAction.update(nodeId, { content, mentions })` on the `input` event (debounced).
 
 ## Node Linking (Symbolic Links)
 
-A **linked node** is a node whose `linkedNodeId` points to a target node. It behaves like a symbolic link:
+A node with `linkId` points to a target node and renders as if it were the target. All edits dispatch on the target's ID. The link node has its own `collapsed` state. Deleting a link node only removes it; the target is unaffected.
 
-- **Content** — always displays the target node's `content`. Editing it updates the target.
-- **Status** — always reflects the target's `statusType`, `projectStatus`, `checked`. Toggling it updates the target.
-- **Children** — renders the target's `childrenIds` subtree. Adding/removing/reordering children on a link node modifies the target's `childrenIds`.
-- **Collapse** — the link node has its own `collapsed` field, independent of the target's collapsed state.
-- **Deletion** — deleting a link node removes only the link; the target and its subtree are untouched.
-- **Circular links** — when resolving a link chain, stop at depth 10 and treat as broken link.
+## Persistence
 
-### Creating a link node
+`usePersistence` subscribes to Jotai atoms via `store` (the jotai store from `useStore`) and debounces writes to IndexedDB:
+- Load on mount: `db.nodes.toArray()` → set atoms
+- Auto-save: subscribe to atom changes → debounced 300ms → `db.nodes.bulkPut()`
 
-1. User types `[[` anywhere in a contenteditable node
-2. A **LinkPopup** (identical UX to MentionPopup) opens — fuse.js search over all nodes
-3. On selection: a **new sibling node** is created below the current node with `linkedNodeId = selectedId`, and `content` / `childrenIds` are intentionally empty (resolved at render time from the target)
-4. The `[[query` text typed so far is cleared before creating the link node
+## NodeView vs Workbench
 
-Alternative creation: right-click a node → "Create link here" → LinkPopup opens.
+For now, only **NodeView** is implemented. Workbench view is deferred.
 
-### Rendering link nodes
+## Implementation Status
 
-`NodeItem` checks `node.linkedNodeId`. If set, it resolves the target via a Zustand selector and renders as if the target were the node:
+### Completed
+- Core Jotai atoms (`store/atoms.ts`)
+- Action factories + dispatch handler (`store/actions.ts`)
+- Action types (`types/actions.ts`)
+- Updated node types (`types/node.ts`)
+- `useNodeKeyboard` skeleton (Enter, Backspace wired; Tab/arrows TBD)
+- `NodeContent` partially wired to Jotai
 
-```
-[⛓] [target content text]    ← link icon prefix, text from target
-  ├─ [target child 1]
-  └─ [target child 2]
-```
+### In Progress (this refactor)
+1. Fix all TypeScript errors from the old Zustand → Jotai migration
+2. Update `NodeItem`, `StatusIndicator`, `NodeTree` to use Jotai
+3. Implement indent/outdent (`makeAction.move`) in `useNodeKeyboard`
+4. Implement ArrowUp/Down navigation in `useNodeKeyboard`
+5. Wire up `NodeView` with `NodeTree`
+6. Wire up `App.tsx` to load data and show active project
+7. Rewrite `usePersistence` for Jotai
+8. Update `Sidebar` to dispatch `create` and `focus` actions
+9. Fix `FloatingToolbar` and `Layout`
 
-- Broken links (target deleted) show `[⛓ broken link]` in muted red, with an option to unlink or delete.
-- The `NodeContent` component receives `effectiveNode = target ?? node`, so all editing/status actions dispatch on the target's ID.
-
-### Store actions
-
-- `createLinkNode(targetId, parentId, afterSiblingId)` — creates a new `NodeData` with `linkedNodeId = targetId`
-- `unlinkNode(linkNodeId)` — sets `linkedNodeId = null`, copies target's current content/status into the link node (makes it independent)
-- Existing `updateNodeContent`, `toggleChecked`, `cycleProjectStatus`, `moveNode` are unaware of links — the component resolves the effective ID before dispatching
-
-### File additions
-
-- `src/components/LinkPopup/` — reuses MentionPopup layout, triggers on `[[`
-- `src/lib/linkResolver.ts` — `resolveLink(nodeId, store): NodeData` with cycle detection
-
-## Drag and Drop
-
-Uses dnd-kit's SortableTree pattern:
-1. Flatten visible tree to flat array (respecting collapse)
-2. Track horizontal drag offset → `getProjection()` computes target depth/parent
-3. On drop, call `store.moveNode(id, newParentId, newIndex)`
-4. Visual: indentation indicator at projected depth during drag
-
-## Persistence (Dexie.js / IndexedDB)
-
-```typescript
-// src/lib/db.ts
-class NotebenchDB extends Dexie {
-  nodes!: Table<NodeData, string>;
-  meta!: Table<{ key: string; value: any }, string>;
-
-  constructor() {
-    super('notebench');
-    this.version(1).stores({
-      nodes: 'id, parentId, isDaily, dailyDate',
-      meta: 'key',
-    });
-  }
-}
-```
-
-- **Auto-save**: Zustand subscription → debounced 300ms → `db.nodes.bulkPut()` for changed nodes
-- **Load**: On startup, `db.nodes.toArray()` → build flat map → hydrate Zustand store
-- **Root ordering**: Stored in `meta` table as `{ key: 'rootIds', value: [...] }`
-- **Export**: `dexie-export-import` → `exportDB(db)` returns a Blob → download as `.json` file
-- **Import**: `importDB(blob)` restores full database from exported file
-
-## Implementation Phases
-
-### Phase 1: Scaffolding + Core Tree with contenteditable
-- Vite + React + TS setup, CSS Modules, global styles, design tokens
-- Types (`node.ts`), Zustand store with treeSlice (create, delete, update, indent, outdent)
-- Layout shell, Sidebar (project list), NodeTree, NodeItem, NodeContent (contenteditable)
-- Keyboard shortcuts: Enter, Tab, Shift+Tab, Backspace, Arrow Up/Down
-- Focus management via `activeNodeId`
-- Dexie.js persistence with debounced auto-save
-
-### Phase 2: Status System
-- StatusIndicator component (none / checkbox / project badge)
-- `toggleChecked`, `cycleProjectStatus` store actions
-- Cmd/Ctrl+Enter shortcut
-- Strikethrough for checked, colored badges for project statuses
-
-### Phase 3: Collapse/Expand + Workbench View
-- Collapse toggle arrow, flatten respecting collapsed state
-- Sidebar view switcher (project detail vs workbench)
-- WorkbenchView: split top/bottom, HorizontalScroller with ProjectCard/DailyCard
-- SettingsPanel with column count sliders (persisted in Dexie meta table)
-- CSS scroll-snap for card navigation
-
-### Phase 4: @ Mentions and Node Linking
-
-**4a — @ Mentions**
-- `@` keystroke detection in contenteditable
-- MentionPopup (floating portal, fuse.js fuzzy search, keyboard navigation)
-- Atomic mention `<span>` insertion into contenteditable
-- `contentParser.ts` for serialize/render of mention markers
-- Live status reflection on mention spans
-- Click-to-navigate on mentions
-
-**4b — Node Linking (symbolic links)**
-- `linkedNodeId` field added to `NodeData` and Dexie schema (version bump)
-- `[[` keystroke detection → LinkPopup (reuses MentionPopup layout)
-- `createLinkNode` store action; `unlinkNode` store action
-- `linkResolver.ts` — chain resolution with depth-10 cycle guard
-- `NodeItem` resolves effective node via `linkedNodeId` before rendering; dispatches all edits on the target's ID
-- Chain icon (⛓) prefix on link node bullets
-- Broken-link state (target deleted): muted red display + unlink/delete options
-- Link node `collapsed` state is local (independent of target's collapsed)
-
-### Phase 5: Drag and Drop
-- @dnd-kit setup, flatten for DnD, `getProjection()`
-- DragOverlayNode, visual depth feedback during drag
-- Edge cases: collapsed subtrees, prevent dropping into own descendants
-
-### Phase 6: Daily Nodes
-- Auto-create today's daily node
-- Sidebar "Today" button, date sorting (latest first)
-- Daily nodes default to linking mode (prompt or UI hint to use @mentions)
-
-### Phase 7: Export / Import
-- `dexie-export-import` integration
-- ExportDialog with download + Import file picker
-- Confirmation dialog for import (overwrites existing data)
-
-### Phase 8: Polish
-- Empty states (no projects yet, no daily notes)
-- Responsive layout for narrow screens
-- Floating toolbar for mobile/touch devices for indentation and other keyboard shortcuts
-- Accessibility: ARIA labels, keyboard-only audit
-- Performance profiling with 500+ nodes
-
-## Verification
-
-After each phase:
-1. `npm run dev` → manual testing in browser
-2. Verify IndexedDB: DevTools → Application → IndexedDB → "notebench"
-3. Phase-specific checks:
-   - Phase 1: Create nodes, indent/outdent, refresh → data persists. Enter/Tab feel instant.
-   - Phase 2: Toggle checkboxes, cycle project status, verify visual indicators
-   - Phase 3: Collapse nodes, switch to workbench view, adjust settings, scroll horizontally
-   - Phase 4a: Type `@`, search, select → mention span appears inline, click navigates, status reflects
-   - Phase 4b: Type `[[`, search, select → linked node created as sibling; editing link node content/status updates original; deleting the link leaves original intact; broken link shows correct error state
-   - Phase 5: Drag to reorder + reparent, verify tree structure after drop
-   - Phase 7: Export → import on fresh browser → verify all nodes restored
+### Deferred
+- Workbench view
+- @ mentions popup
+- Node linking UI (`[[` trigger)
+- Export/import dialog
+- Settings panel
+- Daily notes auto-creation

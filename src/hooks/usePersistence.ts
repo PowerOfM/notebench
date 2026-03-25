@@ -1,169 +1,97 @@
 import { useEffect, useRef } from "react";
+import { getDefaultStore } from "jotai";
 import { db } from "../lib/db";
-import { useStore } from "../store";
+import { nodesAtom, pinnedIdsAtom, dailyIdsAtom, activeParentIdAtom } from "../store/atoms";
 import type { INode, INodeMap } from "../types/node";
 
-const SETTINGS_KEYS = ["projectColumns", "dailyColumns"] as const;
-type SettingsKey = (typeof SETTINGS_KEYS)[number];
-
-/**
- * Loads data from IndexedDB on mount, then subscribes to store changes
- * and debounces saves back to IndexedDB.
- */
 export function usePersistence() {
-  const loadNodes = useStore((s) => s.loadNodes);
-  const setActiveProject = useStore((s) => s.setActiveProject);
-  const setProjectColumns = useStore((s) => s.setProjectColumns);
-  const setDailyColumns = useStore((s) => s.setDailyColumns);
-  const createDailyNode = useStore((s) => s.createDailyNode);
-
-  // Accumulated dirty state — persists across subscription calls so the
-  // debounced timer always sees the full picture regardless of which
-  // subscription invocation last reset the timer.
+  const store = getDefaultStore();
   const dirtyRef = useRef<Set<string>>(new Set());
   const deletedIdsRef = useRef<Set<string>>(new Set());
-  const rootIdsDirtyRef = useRef(false);
+  const pinnedDirtyRef = useRef(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevNodesRef = useRef<INodeMap>({});
-  const prevRootIdsRef = useRef<string[]>([]);
 
   // Load from DB on mount
   useEffect(() => {
     async function load() {
-      const [allNodes, rootIdsMeta, ...settingsMetas] = await Promise.all([
-        db.nodes.toArray(),
-        db.meta.get("rootIds"),
-        ...SETTINGS_KEYS.map((k) => db.meta.get(k)),
-      ]);
-      const rootIds: string[] = rootIdsMeta
-        ? (rootIdsMeta.value as string[])
-        : [];
-      loadNodes(allNodes, rootIds);
+      const allNodes = await db.nodes.toArray();
+      const nodeMap: INodeMap = {};
+      const pinnedIds: string[] = [];
+      const dailyIds: string[] = [];
 
-      // Restore settings
-      const setters: Record<SettingsKey, (n: number) => void> = {
-        projectColumns: setProjectColumns,
-        dailyColumns: setDailyColumns,
-      };
-      SETTINGS_KEYS.forEach((key, i) => {
-        const meta = settingsMetas[i];
-        if (meta?.value != null) setters[key](meta.value as number);
-      });
-
-      // Auto-create today's daily node if it doesn't exist yet
-      const todayDate = new Date().toISOString().slice(0, 10);
-      const hasTodayNode = allNodes.some(
-        (n) => n.isDaily && n.dailyDate === todayDate,
-      );
-      if (!hasTodayNode) {
-        createDailyNode(todayDate);
+      for (const node of allNodes) {
+        nodeMap[node.id] = node;
+        if (node.isPinned) pinnedIds.push(node.id);
+        if (node.isDaily) dailyIds.push(node.id);
       }
 
-      // Auto-activate first non-daily root node, or fall back to today's daily
-      const firstProjectId = rootIds.find((id) => {
-        const n = allNodes.find((x) => x.id === id);
-        return n && !n.isDaily;
-      });
-      if (firstProjectId) {
-        setActiveProject(firstProjectId);
-      } else if (rootIds.length > 0) {
-        setActiveProject(rootIds[0]);
+      // Restore pinned order from meta
+      const pinnedMeta = await db.meta.get("pinnedIds");
+      const orderedPinned = pinnedMeta?.value as string[] | undefined;
+      const finalPinned = orderedPinned
+        ? orderedPinned.filter((id) => nodeMap[id])
+        : pinnedIds;
+
+      store.set(nodesAtom, nodeMap);
+      store.set(pinnedIdsAtom, finalPinned);
+      store.set(dailyIdsAtom, dailyIds);
+
+      if (finalPinned.length > 0) {
+        store.set(activeParentIdAtom, finalPinned[0]);
       }
     }
     load();
-  }, [
-    loadNodes,
-    setActiveProject,
-    setProjectColumns,
-    setDailyColumns,
-    createDailyNode,
-  ]);
-
-  // Save settings to meta when they change
-  useEffect(() => {
-    const unsub = useStore.subscribe((state, prev) => {
-      const saves: Promise<unknown>[] = [];
-      for (const key of SETTINGS_KEYS) {
-        if (state[key] !== prev[key]) {
-          saves.push(db.meta.put({ key, value: state[key] }));
-        }
-      }
-      if (saves.length > 0) Promise.all(saves);
-    });
-    return () => unsub();
   }, []);
 
-  // Subscribe to changes and debounce writes
+  // Subscribe to atom changes and debounce saves
   useEffect(() => {
-    const unsub = useStore.subscribe((state) => {
-      const { nodes, rootIds } = state;
+    const unsub = store.sub(nodesAtom, () => {
+      const nodes = store.get(nodesAtom);
+      const prev = prevNodesRef.current;
 
-      // Accumulate changed nodes into the dirty ref
       for (const id in nodes) {
-        if (nodes[id] !== prevNodesRef.current[id]) {
-          dirtyRef.current.add(id);
-        }
+        if (nodes[id] !== prev[id]) dirtyRef.current.add(id);
       }
-
-      // Accumulate deleted nodes into the deleted ref
-      for (const id in prevNodesRef.current) {
+      for (const id in prev) {
         if (!nodes[id]) {
           deletedIdsRef.current.add(id);
-          // A deleted node is definitely no longer dirty
           dirtyRef.current.delete(id);
         }
       }
-
-      // Accumulate rootIds changes
-      if (JSON.stringify(rootIds) !== JSON.stringify(prevRootIdsRef.current)) {
-        rootIdsDirtyRef.current = true;
-      }
-
       prevNodesRef.current = nodes;
-      prevRootIdsRef.current = rootIds;
+      scheduleSave();
+    });
 
-      if (
-        dirtyRef.current.size === 0 &&
-        deletedIdsRef.current.size === 0 &&
-        !rootIdsDirtyRef.current
-      ) {
-        return;
-      }
+    const unsubPinned = store.sub(pinnedIdsAtom, () => {
+      pinnedDirtyRef.current = true;
+      scheduleSave();
+    });
 
-      // Debounce the actual DB write
+    function scheduleSave() {
       if (timerRef.current) clearTimeout(timerRef.current);
       timerRef.current = setTimeout(async () => {
-        // Drain all accumulated dirty state
         const dirty = [...dirtyRef.current];
         dirtyRef.current.clear();
         const deletedIds = [...deletedIdsRef.current];
         deletedIdsRef.current.clear();
-        const shouldSaveRootIds = rootIdsDirtyRef.current;
-        rootIdsDirtyRef.current = false;
+        const savePinned = pinnedDirtyRef.current;
+        pinnedDirtyRef.current = false;
 
-        // Use the live store state for nodes/rootIds so we always write
-        // the latest values rather than stale closure data.
-        const liveState = useStore.getState();
-
-        const toSave: INode[] = [];
-        for (const id of dirty) {
-          if (liveState.nodes[id]) toSave.push(liveState.nodes[id]);
-        }
+        const nodes = store.get(nodesAtom);
+        const toSave: INode[] = dirty.filter((id) => nodes[id]).map((id) => nodes[id]);
 
         await Promise.all([
           toSave.length > 0 ? db.nodes.bulkPut(toSave) : Promise.resolve(),
-          deletedIds.length > 0
-            ? db.nodes.bulkDelete(deletedIds)
-            : Promise.resolve(),
-          shouldSaveRootIds
-            ? db.meta.put({ key: "rootIds", value: liveState.rootIds })
-            : Promise.resolve(),
+          deletedIds.length > 0 ? db.nodes.bulkDelete(deletedIds as "id"[]) : Promise.resolve(),
+          savePinned ? db.meta.put({ key: "pinnedIds", value: store.get(pinnedIdsAtom) }) : Promise.resolve(),
         ]);
       }, 300);
-    });
+    }
 
     return () => {
       unsub();
+      unsubPinned();
       if (timerRef.current) clearTimeout(timerRef.current);
     };
   }, []);

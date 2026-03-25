@@ -14,13 +14,15 @@ import {
   SortableContext,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
+import { useAtomValue, useSetAtom } from "jotai";
 import { useState } from "react";
 import {
   flattenVisible,
   getDescendantIds,
   getProjection,
 } from "../../lib/tree";
-import { useStore } from "../../store";
+import { makeAction, nodeActionAtom } from "../../store/actions";
+import { nodesAtom } from "../../store/atoms";
 import { DragOverlayNode } from "./DragOverlayNode";
 import { NodeItem } from "./NodeItem";
 import styles from "./NodeTree.module.css";
@@ -28,12 +30,12 @@ import styles from "./NodeTree.module.css";
 const INDENT_SIZE = 24;
 
 interface NodeTreeProps {
-  rootId: string[];
+  rootIds: string[];
 }
 
-export function NodeTree({ rootId }: NodeTreeProps) {
-  const nodes = useStore((s) => s.nodes);
-  const moveNode = useStore((s) => s.moveNode);
+export function NodeTree({ rootIds }: NodeTreeProps) {
+  const nodes = useAtomValue(nodesAtom);
+  const dispatch = useSetAtom(nodeActionAtom);
 
   const [activeId, setActiveId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
@@ -81,7 +83,7 @@ export function NodeTree({ rootId }: NodeTreeProps) {
       const isValid =
         over.id !== active.id && !descendants.includes(over.id as string);
       if (isValid) {
-        moveNode(active.id as string, projected.parentId, projected.index);
+        dispatch(makeAction.move(active.id as string, projected.parentId, projected.index));
       }
     }
     resetState();

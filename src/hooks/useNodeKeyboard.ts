@@ -1,6 +1,8 @@
-import { useSetAtom } from "jotai";
+import { useAtomValue, useSetAtom } from "jotai";
 import { useCallback } from "react";
+import { flattenVisible } from "../lib/tree";
 import { makeAction, nodeActionAtom } from "../store/actions";
+import { nodesAtom, pinnedIdsAtom } from "../store/atoms";
 import { INode } from "../types/node";
 
 interface UseNodeKeyboardOptions {
@@ -17,6 +19,8 @@ export function useNodeKeyboard({
   isRootTitle = false,
 }: UseNodeKeyboardOptions) {
   const dispatch = useSetAtom(nodeActionAtom);
+  const nodes = useAtomValue(nodesAtom);
+  const pinnedIds = useAtomValue(pinnedIdsAtom);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLDivElement>) => {
@@ -51,20 +55,50 @@ export function useNodeKeyboard({
 
       if (e.key === "Tab" && !e.shiftKey) {
         e.preventDefault();
-        console.log("TODO: implement indentNode");
-        // store.indentNode(nodeId);
-        // store.setActiveNode(nodeId, true);
+        // Indent: make this node a child of its previous sibling
+        const siblings =
+          node.parentId == null
+            ? pinnedIds
+            : (nodes[node.parentId]?.childrenIds ?? []);
+        const currentIndex = siblings.indexOf(node.id);
+        if (currentIndex > 0) {
+          const prevSiblingId = siblings[currentIndex - 1];
+          const prevSibling = nodes[prevSiblingId];
+          if (prevSibling) {
+            dispatch(
+              makeAction.move(
+                node.id,
+                prevSiblingId,
+                prevSibling.childrenIds?.length ?? 0,
+              ),
+            );
+          }
+        }
         return;
       }
 
       if (e.key === "Tab" && e.shiftKey) {
         e.preventDefault();
-        console.log("TODO: implement outdentNode");
-        // Don't outdent if already a direct child of a root project node
-        // const parent = node.parentId ? nodes[node.parentId] : null;
-        // if (!parent || parent.parentId === null) return;
-        // store.outdentNode(nodeId);
-        // store.setActiveNode(nodeId, true);
+        // Outdent: move node to be a sibling of its parent (after the parent)
+        if (node.parentId == null) return; // already root
+        const parent = nodes[node.parentId];
+        if (!parent) return;
+        const grandparentId = parent.parentId;
+        const grandparentChildren =
+          grandparentId == null
+            ? pinnedIds
+            : (nodes[grandparentId]?.childrenIds ?? []);
+        const parentIndexInGrandparent = grandparentChildren.indexOf(
+          node.parentId,
+        );
+        if (parentIndexInGrandparent === -1) return;
+        dispatch(
+          makeAction.move(
+            node.id,
+            grandparentId,
+            parentIndexInGrandparent + 1,
+          ),
+        );
         return;
       }
 
@@ -80,11 +114,11 @@ export function useNodeKeyboard({
         if (isEmpty || atStart) {
           e.preventDefault();
           // Navigate to previous node before deleting
-          // const flat = flattenVisible(rootIds, nodes);
-          // const idx = flat.findIndex((f) => f.id === nodeId);
-          // if (idx > 0) {
-          // store.setActiveNode(flat[idx - 1].id, true);
-          // }
+          const flat = flattenVisible(pinnedIds, nodes);
+          const idx = flat.findIndex((f) => f.id === node.id);
+          if (idx > 0) {
+            dispatch(makeAction.focus(flat[idx - 1].id));
+          }
           dispatch(makeAction.remove(node));
           return;
         }
@@ -92,17 +126,25 @@ export function useNodeKeyboard({
 
       if (e.key === "ArrowUp") {
         e.preventDefault();
-        console.log("TODO: implement focusNodeUp");
+        const flat = flattenVisible(pinnedIds, nodes);
+        const idx = flat.findIndex((f) => f.id === node.id);
+        if (idx > 0) {
+          dispatch(makeAction.focus(flat[idx - 1].id));
+        }
         return;
       }
 
       if (e.key === "ArrowDown") {
         e.preventDefault();
-        console.log("TODO: implement focusNodeDown");
+        const flat = flattenVisible(pinnedIds, nodes);
+        const idx = flat.findIndex((f) => f.id === node.id);
+        if (idx !== -1 && idx < flat.length - 1) {
+          dispatch(makeAction.focus(flat[idx + 1].id));
+        }
         return;
       }
     },
-    [node, index, dispatch, divRef],
+    [node, index, dispatch, divRef, nodes, pinnedIds],
   );
 
   return { handleKeyDown };

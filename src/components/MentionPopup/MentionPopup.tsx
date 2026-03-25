@@ -1,7 +1,8 @@
+import { useAtomValue } from "jotai";
 import { useEffect, useImperativeHandle, useState } from "react";
 import { createPortal } from "react-dom";
 import { useFuzzySearch } from "../../hooks/useFuzzySearch";
-import { useStore } from "../../store";
+import { nodesAtom } from "../../store/atoms";
 import type { INode } from "../../types/node";
 import styles from "./MentionPopup.module.css";
 
@@ -28,7 +29,7 @@ export function MentionPopup({
   onClose,
   ref,
 }: MentionPopupProps) {
-  const nodeMap = useStore((s) => s.nodes);
+  const nodeMap = useAtomValue(nodesAtom);
   const [selectedIndex, setSelectedIndex] = useState(0);
 
   const results = useFuzzySearch(nodeMap, excludeNodeId, query);
