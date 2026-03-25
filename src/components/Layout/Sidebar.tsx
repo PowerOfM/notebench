@@ -3,7 +3,8 @@ import { useAtomValue, useSetAtom } from "jotai";
 import { useState } from "react";
 import { nodesAtom, pinnedIdsAtom } from "../../store/atoms";
 import styles from "./Sidebar.module.css";
-import { makeAction, nodeActionAtom } from "../../store/actions";
+import { makeAction } from "../../store/actions";
+import { nodeActionAtom } from "../../store/dispatch";
 
 /** Close the sidebar on narrow screens after a navigation action. */
 // function useCloseSidebarOnMobile() {
@@ -22,16 +23,11 @@ interface IProps {
 
 export function Sidebar({ activeId, onSelectId }: IProps) {
   const dispatch = useSetAtom(nodeActionAtom);
-  const [activeView, setActiveView] = useState<"project" | "workbench">(
-    "project",
-  );
+  const [activeView] = useState<"project" | "workbench">("project");
   const nodes = useAtomValue(nodesAtom);
   const pinnedIds = useAtomValue(pinnedIdsAtom);
 
   const handleAddProject = () => dispatch(makeAction.create(null));
-
-  console.log("nodes", nodes);
-  console.log("pinnedIds", pinnedIds);
 
   // const handleTodayClick = useCallback(() => {
   //   const todayNode = Object.values(nodes).find(

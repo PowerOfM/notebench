@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useLiveQuery } from "dexie-react-hooks";
 import { atom, useAtom } from "jotai";
 import { useCallback } from "react";

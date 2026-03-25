@@ -122,9 +122,9 @@ export function flattenVisible(
     if (!node) continue;
     result.push({ id, depth });
     // Link nodes use their own collapsed state but show the target's children
-    const effectiveChildren = node.linkId
+    const effectiveChildren: string[] = node.linkId
       ? (resolveLink(node.linkId, nodes)?.childrenIds ?? [])
-      : node.childrenIds;
+      : (node.childrenIds ?? []);
     if (!node.collapsed && effectiveChildren.length > 0) {
       result.push(...flattenVisible(effectiveChildren, nodes, depth + 1));
     }
@@ -137,22 +137,22 @@ export function flattenVisible(
  */
 export function getSiblings(
   node: INode,
-  nodes: NodeMap,
+  nodes: INodeMap,
   rootIds: string[],
 ): string[] {
   if (node.parentId === null) return rootIds;
   const parent = nodes[node.parentId];
-  return parent ? parent.childrenIds : [];
+  return parent ? (parent.childrenIds ?? []) : [];
 }
 
 /**
  * Get all descendant IDs of a node.
  */
-export function getDescendantIds(id: string, nodes: NodeMap): string[] {
+export function getDescendantIds(id: string, nodes: INodeMap): string[] {
   const node = nodes[id];
   if (!node) return [];
   const result: string[] = [];
-  for (const childId of node.childrenIds) {
+  for (const childId of node.childrenIds ?? []) {
     result.push(childId, ...getDescendantIds(childId, nodes));
   }
   return result;
