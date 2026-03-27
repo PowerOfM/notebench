@@ -1,12 +1,12 @@
-import { INodeMap, INode } from "../types/node";
+import { INodeMap } from "../types/node";
 
 export function addToParent(
-  state: INodeMap,
+  mutableState: INodeMap,
   parentId: string,
-  child: INode,
+  childId: string,
   index?: number,
 ) {
-  const parent = state[parentId];
+  const parent = mutableState[parentId];
   if (!parent) {
     console.error(`Parent node ${parentId} not found`);
     return false;
@@ -14,48 +14,55 @@ export function addToParent(
 
   const childrenIds = parent.childrenIds ? [...parent.childrenIds] : [];
   if (index != null && index >= 0 && index < childrenIds.length) {
-    childrenIds.splice(index, 0, child.id);
+    childrenIds.splice(index, 0, childId);
   } else {
-    childrenIds.push(child.id);
+    childrenIds.push(childId);
   }
-  state[parentId] = { ...parent, childrenIds, updatedAt: Date.now() };
+  mutableState[parentId] = { ...parent, childrenIds, updatedAt: Date.now() };
   return true;
 }
 
 export function removeFromParent(
-  state: INodeMap,
+  mutableState: INodeMap,
   parentId: string,
-  child: INode,
+  childId: string,
 ) {
-  const parent = state[parentId];
+  const parent = mutableState[parentId];
   if (!parent) {
     console.error(`Parent node ${parentId} not found`);
-    return -1;
+    return undefined;
   }
 
   const childrenIds = parent.childrenIds ? [...parent.childrenIds] : [];
-  const index = childrenIds.indexOf(child.id);
-  if (index !== -1) {
-    childrenIds.splice(index, 1);
-    state[parentId] = { ...parent, childrenIds, updatedAt: Date.now() };
+  const index = childrenIds.indexOf(childId);
+  if (index === -1) {
+    return undefined;
   }
 
+  childrenIds.splice(index, 1);
+  mutableState[parentId] = { ...parent, childrenIds, updatedAt: Date.now() };
   return index;
 }
 
-export function addToPinned(state: string[], childId: string, index?: number) {
-  if (index != null && index >= 0 && index < state.length) {
-    state.splice(index, 0, childId);
+export function addToPinned(
+  mutableState: string[],
+  childId: string,
+  index?: number,
+) {
+  if (index != null && index >= 0 && index < mutableState.length) {
+    mutableState.splice(index, 0, childId);
   } else {
-    state.push(childId);
+    mutableState.push(childId);
   }
   return true;
 }
 
-export function removeFromPinned(state: string[], child: INode) {
-  const index = state.indexOf(child.id);
-  if (index !== -1) {
-    state.splice(index, 1);
+export function removeFromPinned(mutableState: string[], childId: string) {
+  const index = mutableState.indexOf(childId);
+  if (index === -1) {
+    return undefined;
   }
+
+  mutableState.splice(index, 1);
   return index;
 }

@@ -1,6 +1,6 @@
-import { useSetAtom } from "jotai";
 import { useCallback } from "react";
-import { makeAction, nodeActionAtom } from "../store/actions";
+import { actions } from "../store/actions";
+import { useDispatch } from "../store/dispatch";
 import { INode } from "../types/node";
 
 interface UseNodeKeyboardOptions {
@@ -16,7 +16,7 @@ export function useNodeKeyboard({
   divRef,
   isRootTitle = false,
 }: UseNodeKeyboardOptions) {
-  const dispatch = useSetAtom(nodeActionAtom);
+  const dispatch = useDispatch();
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLDivElement>) => {
@@ -25,15 +25,15 @@ export function useNodeKeyboard({
         if (isRootTitle) {
           // Focus first child, or create one if none exists
           if (node.childrenIds && node.childrenIds.length > 0) {
-            dispatch(makeAction.focus(node.childrenIds[0]));
+            dispatch(actions.focus(node.childrenIds[0]));
           } else {
-            dispatch(makeAction.create(node.id, 0, {}, false));
+            dispatch(actions.create(node.id, {}, 0, true));
           }
           return;
         }
 
         // TODO: split current node at cursor position, and potentially move children
-        dispatch(makeAction.create(node.parentId, index + 1, {}, false));
+        dispatch(actions.create(node.parentId, {}, index + 1, false));
         return;
       }
 
@@ -41,7 +41,7 @@ export function useNodeKeyboard({
         e.preventDefault();
         if (node.status?.type === "checkbox") {
           dispatch(
-            makeAction.update(node.id, {
+            actions.update(node.id, {
               status: { type: "checkbox", checked: !node.status.checked },
             }),
           );
@@ -85,7 +85,7 @@ export function useNodeKeyboard({
           // if (idx > 0) {
           // store.setActiveNode(flat[idx - 1].id, true);
           // }
-          dispatch(makeAction.remove(node));
+          dispatch(actions.remove(node));
           return;
         }
       }

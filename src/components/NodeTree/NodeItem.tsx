@@ -1,35 +1,26 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import clsx from "clsx";
+import { useAtomValue } from "jotai";
 import { ChevronRight, GripVertical } from "lucide-react";
 import { memo, useCallback } from "react";
-import { resolveLink } from "../../lib/linkResolver";
-import { useStore } from "../../store";
+import { actions } from "../../store/actions";
+import { nodesAtom } from "../../store/atoms";
+import { useDispatch } from "../../store/dispatch";
 import { NodeContent } from "../NodeContent/NodeContent";
 import { StatusIndicator } from "../StatusIndicator/StatusIndicator";
 import styles from "./NodeItem.module.css";
 import { NodeItemMenu } from "./NodeItemMenu";
+import { INode } from "../../types/node";
 
 interface NodeItemProps {
-  nodeId: string;
+  node: INode;
   depth: number;
 }
 
-export const NodeItem = memo(function NodeItem({
-  nodeId,
-  depth,
-}: NodeItemProps) {
-  // Subscribe only to the specific node — not the full nodes map
-  const node = useStore((s) => s.nodes[nodeId]);
-
-  // If this is a link node, also subscribe to its direct target so we
-  // re-render when the target's content/status changes
-  const isLink = !!node.linkId;
-  useStore((s) => (node.linkId ? s.nodes[node.linkId] : null));
-
-  const toggleCollapsed = useStore((s) => s.toggleCollapsed);
-  const unlinkNode = useStore((s) => s.unlinkNode);
-  const deleteNode = useStore((s) => s.deleteNode);
+export function NodeItem({ node, depth }: NodeItemProps) {
+  const dispatch = useDispatch();
+  const isLink = !!node?.linkId;
 
   const {
     attributes: { role: _role, ...attributes },
@@ -38,47 +29,49 @@ export const NodeItem = memo(function NodeItem({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: nodeId });
+  } = useSortable({ id: node.id });
 
   const handleCollapseClick = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      toggleCollapsed(nodeId);
+      dispatch(actions.update(node.id, { collapsed: !node.collapsed }));
     },
-    [nodeId, toggleCollapsed],
+    [node.id, dispatch],
   );
 
-  const handleUnlink = useCallback(
-    (e: React.MouseEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      unlinkNode(nodeId);
-    },
-    [nodeId, unlinkNode],
-  );
+  // const handleUnlink = useCallback(
+  //   (e: React.MouseEvent) => {
+  //     e.preventDefault();
+  //     e.stopPropagation();
+  //     unlinkNode(nodeId);
+  //   },
+  //   [nodeId, unlinkNode],
+  // );
 
   const handleDelete = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      deleteNode(nodeId);
+      dispatch(actions.remove(node));
     },
-    [nodeId, deleteNode],
+    [node.id, dispatch],
   );
 
   // Use getState() for resolveLink — reads current state without subscribing to
   // the full nodes map (avoids re-rendering all NodeItems on any node change)
-  const linkedNode = isLink
-    ? resolveLink(nodeId, useStore.getState().nodes)
-    : null;
+  // const linkedNode = isLink
+  //   ? resolveLink(nodeId, useStore.getState().nodes)
+  //   : null;
 
   if (!node) {
     return null;
   }
 
-  const effectiveId = effectiveNode!.id;
-  const hasChildren = effectiveNode!.childrenIds.length > 0;
+  // const effectiveId = effectiveNode!.id;
+  // const hasChildren = effectiveNode!.childrenIds.length > 0;
+  const effectiveId = node.id;
+  const hasChildren = node.childrenIds?.length ?? 0 > 0;
   const cssVars = {
     "--depth": depth,
     transform: CSS.Transform.toString(transform),
@@ -132,13 +125,11 @@ export const NodeItem = memo(function NodeItem({
           ⛓
         </span>
       )}
-      <StatusIndicator nodeId={effectiveId} />
+      <StatusIndicator node={node} />
       <NodeContent
-        nodeId={nodeId}
+        node={node}
         effectiveNodeId={isLink ? effectiveId : undefined}
-        strikethrough={
-          effectiveNode!.statusType === "checkable" && effectiveNode!.checked
-        }
+        strikethrough={node.status?.type === "checkbox" && node.status.checked}
       />
       <NodeItemMenu onDelete={handleDelete} />
     </div>

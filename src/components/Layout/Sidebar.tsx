@@ -1,9 +1,10 @@
 import clsx from "clsx";
-import { useAtomValue, useSetAtom } from "jotai";
+import { useAtomValue } from "jotai";
 import { useState } from "react";
+import { actions } from "../../store/actions";
 import { nodesAtom, pinnedIdsAtom } from "../../store/atoms";
+import { useDispatch } from "../../store/dispatch";
 import styles from "./Sidebar.module.css";
-import { makeAction, nodeActionAtom } from "../../store/actions";
 
 /** Close the sidebar on narrow screens after a navigation action. */
 // function useCloseSidebarOnMobile() {
@@ -21,14 +22,18 @@ interface IProps {
 }
 
 export function Sidebar({ activeId, onSelectId }: IProps) {
-  const dispatch = useSetAtom(nodeActionAtom);
+  const dispatch = useDispatch();
   const [activeView, setActiveView] = useState<"project" | "workbench">(
     "project",
   );
   const nodes = useAtomValue(nodesAtom);
   const pinnedIds = useAtomValue(pinnedIdsAtom);
 
-  const handleAddProject = () => dispatch(makeAction.create(null));
+  const handleAddProject = () => {
+    const action = actions.create(null, {}, undefined, true);
+    dispatch(action);
+    onSelectId(action.action.node.id);
+  };
 
   console.log("nodes", nodes);
   console.log("pinnedIds", pinnedIds);

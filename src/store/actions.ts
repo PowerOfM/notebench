@@ -1,5 +1,11 @@
 import { createNode } from "../lib/tree";
-import { IDispatchEvent } from "../types/actions";
+import {
+  IDispatchEventGeneric,
+  INodeAddAction,
+  INodeMoveAction,
+  INodeRemoveAction,
+  INodeUpdateAction,
+} from "../types/actions";
 import { INode, INodeChanges } from "../types/node";
 
 export const actions = {
@@ -8,11 +14,14 @@ export const actions = {
     input: INodeChanges = {},
     index?: number,
     autoFocus = true,
-  ): IDispatchEvent => {
+  ): IDispatchEventGeneric<INodeAddAction> => {
     const node = createNode(parentId, input);
     return { action: { type: "add", node, index, autoFocus }, focus: node.id };
   },
-  update: (nodeId: string, payload: INodeChanges): IDispatchEvent => ({
+  update: (
+    nodeId: string,
+    payload: INodeChanges,
+  ): IDispatchEventGeneric<INodeUpdateAction> => ({
     action: { type: "update", nodeId, payload },
     focus: nodeId,
   }),
@@ -20,13 +29,19 @@ export const actions = {
     nodeId: string,
     parentId: string | null,
     index?: number,
-  ): IDispatchEvent => ({
+  ): IDispatchEventGeneric<INodeMoveAction> => ({
     action: { type: "move", nodeId, parentId, index },
     focus: nodeId,
   }),
-  remove: (node: INode, focus?: string): IDispatchEvent => ({
+  remove: (
+    node: INode,
+    focus?: string,
+  ): IDispatchEventGeneric<INodeRemoveAction> => ({
     action: { type: "remove", node },
     focus: focus ?? null,
   }),
-  focus: (focus: string): IDispatchEvent => ({ action: null, focus }),
+  focus: (focus: string | null): IDispatchEventGeneric<null> => ({
+    action: null,
+    focus,
+  }),
 };

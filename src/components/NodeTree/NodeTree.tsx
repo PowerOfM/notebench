@@ -14,13 +14,17 @@ import {
   SortableContext,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { useState } from "react";
 import {
   flattenVisible,
   getDescendantIds,
   getProjection,
 } from "../../lib/tree";
-import { useStore } from "../../store";
+
+import { useAtom, useAtomValue } from "jotai";
+import { useState } from "react";
+import { actions } from "../../store/actions";
+import { focusedIdAtom, nodesAtom } from "../../store/atoms";
+import { useDispatch } from "../../store/dispatch";
 import { DragOverlayNode } from "./DragOverlayNode";
 import { NodeItem } from "./NodeItem";
 import styles from "./NodeTree.module.css";
@@ -28,19 +32,19 @@ import styles from "./NodeTree.module.css";
 const INDENT_SIZE = 24;
 
 interface NodeTreeProps {
-  rootId: string[];
+  rootId: string;
 }
 
 export function NodeTree({ rootId }: NodeTreeProps) {
-  const nodes = useStore((s) => s.nodes);
-  const moveNode = useStore((s) => s.moveNode);
+  const nodes = useAtomValue(nodesAtom);
+  const dispatch = useDispatch();
 
-  const [activeId, setActiveId] = useState<string | null>(null);
+  const [activeId, setActiveId] = useAtom(focusedIdAtom);
   const [overId, setOverId] = useState<string | null>(null);
   const [offsetX, setOffsetX] = useState(0);
 
-  const flat = flattenVisible(rootIds, nodes);
-  const sortedIds = flat.map((i) => i.id);
+  const flat = flattenVisible([rootId], nodes);
+  // const sortedIds = flat.map((i) => i.id);
 
   const raw =
     activeId && overId
@@ -81,7 +85,13 @@ export function NodeTree({ rootId }: NodeTreeProps) {
       const isValid =
         over.id !== active.id && !descendants.includes(over.id as string);
       if (isValid) {
-        moveNode(active.id as string, projected.parentId, projected.index);
+        dispatch(
+          actions.move(
+            active.id as string,
+            projected.parentId,
+            projected.index,
+          ),
+        );
       }
     }
     resetState();
@@ -97,14 +107,17 @@ export function NodeTree({ rootId }: NodeTreeProps) {
       onDragEnd={handleDragEnd}
       onDragCancel={resetState}
     >
-      <SortableContext items={sortedIds} strategy={verticalListSortingStrategy}>
+      <SortableContext items={flat} strategy={verticalListSortingStrategy}>
         <div className={styles.tree} role="tree" aria-label="Notes tree">
-          {flat.map(({ id, depth }) => {
+          {flat.map(({ node, depth }) => {
             const isOver =
-              activeId && overId === id && activeId !== id && projected;
+              activeId &&
+              overId === node.id &&
+              activeId !== node.id &&
+              projected;
             return (
-              <div key={id}>
-                <NodeItem nodeId={id} depth={depth} />
+              <div key={node.id}>
+                <NodeItem node={node} depth={depth} />
                 {isOver && (
                   <div
                     className={styles.dropLine}
@@ -119,9 +132,9 @@ export function NodeTree({ rootId }: NodeTreeProps) {
         </div>
       </SortableContext>
       <DragOverlay dropAnimation={null}>
-        {activeId ? (
+        {activeId && nodes[activeId] ? (
           <DragOverlayNode
-            nodeId={activeId}
+            node={nodes[activeId]}
             depth={
               projected?.depth ??
               flat.find((i) => i.id === activeId)?.depth ??

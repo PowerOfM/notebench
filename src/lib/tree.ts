@@ -4,7 +4,7 @@ import { resolveLink } from "./linkResolver";
 
 export const ROOT_ID = "$$root$$";
 
-export interface FlatNode {
+export interface IFlatNode {
   id: string;
   depth: number;
 }
@@ -56,7 +56,7 @@ function arrayMove<T>(array: T[], from: number, to: number): T[] {
  * horizontal drag offset.
  */
 export function getProjection(
-  items: FlatNode[],
+  items: IFlatNode[],
   activeId: string,
   overId: string,
   dragOffsetX: number,
@@ -115,8 +115,8 @@ export function flattenVisible(
   ids: string[],
   nodes: INodeMap,
   depth = 0,
-): FlatNode[] {
-  const result: FlatNode[] = [];
+): IFlatNode[] {
+  const result: IFlatNode[] = [];
   for (const id of ids) {
     const node = nodes[id];
     if (!node) continue;
@@ -125,7 +125,7 @@ export function flattenVisible(
     const effectiveChildren = node.linkId
       ? (resolveLink(node.linkId, nodes)?.childrenIds ?? [])
       : node.childrenIds;
-    if (!node.collapsed && effectiveChildren.length > 0) {
+    if (!node.collapsed && effectiveChildren && effectiveChildren.length > 0) {
       result.push(...flattenVisible(effectiveChildren, nodes, depth + 1));
     }
   }

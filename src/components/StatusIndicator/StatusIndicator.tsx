@@ -1,68 +1,79 @@
-import { useCallback } from 'react';
-import { useStore } from '../../store';
-import type { StatusType } from '../../types/node';
-import styles from './StatusIndicator.module.css';
+import { useCallback } from "react";
+import { actions } from "../../store/actions";
+import { useDispatch } from "../../store/dispatch";
+import type { INode } from "../../types/node";
+import styles from "./StatusIndicator.module.css";
 
 const STATUS_LABELS: Record<string, string> = {
-  todo: 'Todo',
-  'in-progress': 'In Progress',
-  done: 'Done',
-  archived: 'Archived',
+  todo: "Todo",
+  "in-progress": "In Progress",
+  done: "Done",
+  archived: "Archived",
 };
 
 const STATUS_CLASS: Record<string, string> = {
   todo: styles.todo,
-  'in-progress': styles.inProgress,
+  "in-progress": styles.inProgress,
   done: styles.done,
   archived: styles.archived,
 };
 
 interface StatusIndicatorProps {
-  nodeId: string;
+  node: INode;
 }
 
-export function StatusIndicator({ nodeId }: StatusIndicatorProps) {
-  const node = useStore((s) => s.nodes[nodeId]);
-  const toggleChecked = useStore((s) => s.toggleChecked);
-  const cycleProjectStatus = useStore((s) => s.cycleProjectStatus);
-  const setStatusType = useStore((s) => s.setStatusType);
+export function StatusIndicator({ node }: StatusIndicatorProps) {
+  const dispatch = useDispatch();
 
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
       if (!node) return;
-      if (node.statusType === 'checkable') {
-        toggleChecked(nodeId);
-      } else if (node.statusType === 'project') {
-        cycleProjectStatus(nodeId);
+      if (node.status?.type === "checkbox") {
+        dispatch(
+          actions.update(node.id, {
+            status: { type: "checkbox", checked: !node.status.checked },
+          }),
+        );
+      } else if (node.status?.type === "project") {
+        dispatch(
+          actions.update(node.id, {
+            status: {
+              type: "project",
+              category:
+                node.status.category === "todo" ? "in-progress" : "done",
+              label: STATUS_LABELS[node.status.category ?? "todo"],
+            },
+          }),
+        );
       }
     },
-    [node, nodeId, toggleChecked, cycleProjectStatus]
+    [node, dispatch],
   );
 
-  const handleContextMenu = useCallback(
-    (e: React.MouseEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (!node) return;
-      // Block type change if the node has a meaningful status value set:
-      // checkable + checked, or project with status beyond 'todo'
-      const isLocked =
-        (node.statusType === 'checkable' && node.checked) ||
-        (node.statusType === 'project' && node.projectStatus !== 'todo');
-      if (isLocked) return;
-      // Cycle status types: none → checkable → project → none
-      const next: StatusType =
-        node.statusType === 'none'
-          ? 'checkable'
-          : node.statusType === 'checkable'
-          ? 'project'
-          : 'none';
-      setStatusType(nodeId, next);
-    },
-    [node, nodeId, setStatusType]
-  );
+  // const handleContextMenu = useCallback(
+  //   (e: React.MouseEvent) => {
+  //     e.preventDefault();
+  //     e.stopPropagation();
+  //     if (!node) return;
+  //     // Block type change if the node has a meaningful status value set:
+  //     // checkable + checked, or project with status beyond 'todo'
+  //     const isLocked =
+  //       (node.status?.type === "checkbox" && node.status.checked) ||
+  //       (node.status?.type === "project" && node.status.category !== "todo");
+  //     if (isLocked) return;
+  //     // Cycle status types: none → checkable → project → none
+  //     const next: StatusType =
+  //       !node.status
+  //         ? "checkbox"
+  //         : node.status?.type === "checkbox"
+  //           ? "project"
+  //           : "none";
+  //     dispatch(actions.update(node.id, { status: { type: next } }));
+  //   },
+  //   [node, nodeId, setStatusType],
+  // );
 
   if (!node) return null;
 
@@ -70,33 +81,37 @@ export function StatusIndicator({ nodeId }: StatusIndicatorProps) {
     <div
       className={styles.indicator}
       onClick={handleClick}
-      onContextMenu={handleContextMenu}
+      // onContextMenu={handleContextMenu}
       title={
-        node.statusType === 'none'
-          ? 'Right-click to set status'
-          : node.statusType === 'checkable'
-          ? node.checked
-            ? 'Checked — click to uncheck'
-            : 'Click to check · Right-click to change type'
-          : node.projectStatus === 'todo'
-          ? `Status: Todo — click to cycle · Right-click to change type`
-          : `Status: ${STATUS_LABELS[node.projectStatus ?? 'todo']} — click to cycle`
+        !node.status
+          ? "Right-click to set status"
+          : node.status?.type === "checkbox"
+            ? node.status.checked
+              ? "Checked — click to uncheck"
+              : "Click to check · Right-click to change type"
+            : node.status?.type === "project"
+              ? `Status: ${STATUS_LABELS[node.status.category ?? "todo"]} — click to cycle`
+              : `Status: Todo — click to cycle · Right-click to change type`
       }
       role="button"
       tabIndex={-1}
       aria-label="Status indicator"
     >
-      {node.statusType === 'none' && <div className={styles.noneHint} />}
+      {!node.status && <div className={styles.noneHint} />}
 
-      {node.statusType === 'checkable' && (
-        <div className={`${styles.checkbox} ${node.checked ? styles.checked : ''}`}>
-          {node.checked && <span className={styles.checkmark}>✓</span>}
+      {node.status?.type === "checkbox" && (
+        <div
+          className={`${styles.checkbox} ${node.status.checked ? styles.checked : ""}`}
+        >
+          {node.status.checked && <span className={styles.checkmark}>✓</span>}
         </div>
       )}
 
-      {node.statusType === 'project' && (
-        <div className={`${styles.badge} ${STATUS_CLASS[node.projectStatus ?? 'todo']}`}>
-          {STATUS_LABELS[node.projectStatus ?? 'todo']}
+      {node.status?.type === "project" && (
+        <div
+          className={`${styles.badge} ${STATUS_CLASS[node.status.category ?? "todo"]}`}
+        >
+          {STATUS_LABELS[node.status.category ?? "todo"]}
         </div>
       )}
     </div>

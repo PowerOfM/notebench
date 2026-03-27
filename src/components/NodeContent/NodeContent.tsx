@@ -1,18 +1,17 @@
 import clsx from "clsx";
-import { useAtom, useAtomValue } from "jotai";
+import { useAtom } from "jotai";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNodeKeyboard } from "../../hooks/useNodeKeyboard";
 import { renderToDOM, serializeFromDOM } from "../../lib/contentParser";
 import { findRoot } from "../../lib/tree";
-import { focusedIdAtom, nodesAtom } from "../../store/atoms";
-import type { IMention } from "../../types/node";
+import { focusedIdAtom } from "../../store/atoms";
+import { useDispatch } from "../../store/dispatch";
+import type { IMention, INode } from "../../types/node";
 import { type MentionPopupHandle } from "../MentionPopup/MentionPopup";
 import styles from "./NodeContent.module.css";
-import { useSetAtom } from "jotai/ts3.8/esm/react";
-import { nodeActionAtom } from "../../store/actions";
 
 interface NodeContentProps {
-  nodeId: string;
+  node: INode;
   /** When set (linked node), content r/w goes to this ID instead of nodeId. */
   effectiveNodeId?: string;
   isRootTitle?: boolean;
@@ -21,18 +20,17 @@ interface NodeContentProps {
 }
 
 export function NodeContent({
-  nodeId,
+  node,
   effectiveNodeId,
   isRootTitle,
   placeholder = "Type something...",
   strikethrough,
 }: NodeContentProps) {
-  const dispatch = useSetAtom(nodeActionAtom)
+  const dispatch = useDispatch();
   const divRef = useRef<HTMLDivElement>(null);
   const mentionPopupRef = useRef<MentionPopupHandle>(null);
   // const linkPopupRef = useRef<MentionPopupHandle>(null);
 
-  const nodes = useAtomValue(nodesAtom);
   const [activeNodeId, setActiveNodeId] = useAtom(focusedIdAtom);
 
   // Content ops target the effective node; focus/active uses the structural nodeId
@@ -40,12 +38,9 @@ export function NodeContent({
   const [content, setContent] = useState(
     () => nodes[contentNodeId]?.content ?? "",
   );
-  const
   const [mentions, setMentions] = useState<IMention[]>(
     () => nodes[contentNodeId]?.mentions ?? [],
   );
-
-
 
   // const content = useStore((s) => s.nodes[contentNodeId]?.content ?? "");
   // const nodes = useStore((s) => s.nodes);
@@ -63,7 +58,7 @@ export function NodeContent({
     isRootTitle,
   });
 
-  const isActive = activeNodeId === nodeId;
+  const isActive = activeNodeId === node.id;
   // Null sentinel ensures the first render always syncs the DOM,
   // even if the node mounts with isActive=true (e.g. via mention navigation).
   const prevNodeIdRef = useRef<string | null>(null);
@@ -92,11 +87,11 @@ export function NodeContent({
   useEffect(() => {
     const div = divRef.current;
     if (!div) return;
-    const nodeChanged = prevNodeIdRef.current !== nodeId;
-    prevNodeIdRef.current = nodeId;
+    const nodeChanged = prevNodeIdRef.current !== node.id;
+    prevNodeIdRef.current = node.id;
     if (!nodeChanged && isActive) return;
     renderToDOM(div, content, nodes, handleMentionClick);
-  }, [nodeId, content, isActive, nodes, handleMentionClick]);
+  }, [node.id, content, isActive, nodes, handleMentionClick]);
 
   // ── Focus management ─────────────────────────────────────────────────────────
   useEffect(() => {

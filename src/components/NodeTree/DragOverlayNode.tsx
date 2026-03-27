@@ -1,20 +1,13 @@
-import { resolveLink } from "../../lib/linkResolver";
-import { useStore } from "../../store";
+import type { INode } from "../../types/node";
 import styles from "./DragOverlayNode.module.css";
 
 interface DragOverlayNodeProps {
-  nodeId: string;
   depth: number;
+  node: INode;
 }
 
-export function DragOverlayNode({ nodeId, depth }: DragOverlayNodeProps) {
-  const node = useStore((s) => s.nodes[nodeId]);
-  const nodes = useStore((s) => s.nodes);
-
-  if (!node) return null;
-
-  const effectiveNode = node.linkId ? resolveLink(nodeId, nodes) : node;
-  const displayContent = effectiveNode?.content ?? "";
+export function DragOverlayNode({ node, depth }: DragOverlayNodeProps) {
+  const displayContent = node?.content ?? "";
 
   return (
     <div

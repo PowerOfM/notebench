@@ -1,24 +1,27 @@
-import { atom, Getter, Setter } from "jotai";
-import { createNode } from "../lib/tree";
+import { Getter, Setter } from "jotai";
+import { pick } from "../lib/pick";
 import type {
   IDispatchEvent,
   IDispatchEventGeneric,
-  INodeAction,
   INodeAddAction,
-  INodeFocusAction,
   INodeMoveAction,
   INodeRemoveAction,
   INodeUpdateAction,
 } from "../types/actions";
-import type { INode, INodeChanges, INodeMap } from "../types/node";
+import type { INode } from "../types/node";
+import { actions } from "./actions";
 import {
   focusedIdAtom,
   nodesAtom,
   pinnedIdsAtom,
   undoStackAtom,
 } from "./atoms";
-import { pick } from "../lib/pick";
-import { addToParent, addToPinned } from "./handlerHelpers";
+import {
+  addToParent,
+  addToPinned,
+  removeFromParent,
+  removeFromPinned,
+} from "./handlerHelpers";
 
 export function handleAddNode(
   get: Getter,
@@ -30,7 +33,7 @@ export function handleAddNode(
 
   if (
     action.node.parentId &&
-    !addToParent(nodesState, action.node.parentId, action.node, action.index)
+    !addToParent(nodesState, action.node.parentId, action.node.id, action.index)
   ) {
     action.node.parentId = null;
   }
@@ -91,197 +94,141 @@ function moveWithinList(
   return prevIndex;
 }
 
-function moveWithinPinnedEffect(
+function handleMoveWithinPinnedIds(
   get: Getter,
   set: Setter,
   nodeId: string,
   newIndex?: number,
 ) {
-  const list = [...get(pinnedIdsAtom)];
-  const prevIndex = moveWithinList(list, nodeId, newIndex);
+  const pinnedIdsState = [...get(pinnedIdsAtom)];
+  const prevIndex = moveWithinList(pinnedIdsState, nodeId, newIndex);
   if (prevIndex === -1) {
     console.error(`Failed to move node ${nodeId} within pinned list`);
     return;
   }
-  set(pinnedIdsAtom, list);
-  const undoAction = makeAction.move(nodeId, null, prevIndex);
+  set(pinnedIdsAtom, pinnedIdsState);
+  const undoAction = actions.move(nodeId, null, prevIndex);
   set(undoStackAtom, [...get(undoStackAtom), undoAction]);
 }
 
-function moveWithinParentEffect(
+function handleMoveWithinParent(
   get: Getter,
   set: Setter,
-  nodes: INodeMap,
-  action: INodeMoveAction,
+  parentId: string,
+  nodeId: string,
+  newIndex?: number,
 ) {
-  if (action.parentId == null) {
-    throw new Error(`Parent ID is null while moving node within parent`);
-  }
-
-  const parent = nodes[action.parentId];
+  const nodesState = { ...get(nodesAtom) };
+  const parent = nodesState[parentId];
   if (!parent) {
-    console.error(`Parent node ${action.parentId} not found while moving node`);
+    console.error(`Parent node ${parentId} not found while moving node`);
     return;
   }
 
   const childrenIds = parent.childrenIds ? [...parent.childrenIds] : [];
-  const prevIndex = moveWithinList(childrenIds, action.nodeId, action.index);
+  const prevIndex = moveWithinList(childrenIds, nodeId, newIndex);
   if (prevIndex === -1) {
-    console.error(
-      `Failed to move node ${action.nodeId} within parent ${action.parentId}`,
-    );
+    console.error(`Failed to move node ${nodeId} within parent ${parentId}`);
     return;
   }
-  const nextState = { ...nodes };
-  nextState[action.parentId] = {
+
+  nodesState[parentId] = {
     ...parent,
     childrenIds,
     updatedAt: Date.now(),
   };
-  set(nodesAtom, nextState);
+  set(nodesAtom, nodesState);
 
-  const undoAction = makeAction.move(action.nodeId, action.parentId, prevIndex);
+  const undoAction = actions.move(nodeId, parentId, prevIndex);
   set(undoStackAtom, [...get(undoStackAtom), undoAction]);
 }
 
-function moveNodeEffect(
+export function handleMoveNode(
   get: Getter,
   set: Setter,
-  nodes: INodeMap,
-  action: INodeMoveAction,
+  { action, focus }: IDispatchEventGeneric<INodeMoveAction>,
 ) {
-  // Validate
-  const node = nodes[action.nodeId];
-  let nodesState = { ...nodes };
-  let pinnedIdsState = [...get(pinnedIdsAtom)];
+  const nodes = get(nodesAtom);
+  const prev = nodes[action.nodeId];
 
-  let prevParentId = node.parentId;
+  let prevParentId = prev.parentId;
+  if (prevParentId == null && action.parentId == null) {
+    return handleMoveWithinPinnedIds(get, set, action.nodeId, action.index);
+  } else if (prevParentId != null && prevParentId === action.parentId) {
+    return handleMoveWithinParent(
+      get,
+      set,
+      prevParentId,
+      action.nodeId,
+      action.index,
+    );
+  }
+
+  const nodesState = { ...nodes };
+  const pinnedIdsState = [...get(pinnedIdsAtom)];
   let prevIndex = undefined;
   if (prevParentId == null) {
-    prevIndex = pinnedIdsState.indexOf(node.id);
-    if (prevIndex === -1) {
-      prevIndex = undefined;
-      console.warn(
-        `Node ${node.id} not found in pinned list while moving node`,
-      );
-    }
-    pinnedIdsState = pinnedIdsState.filter((id) => id !== node.id);
+    prevIndex = removeFromPinned(pinnedIdsState, action.nodeId);
   } else {
-    const prevParent = nodes[prevParentId];
-    if (!prevParent) {
-      console.error(`Parent node ${prevParentId} not found while moving node`);
-      return;
-    }
-    prevIndex = prevParent.childrenIds?.indexOf(node.id);
-    if (prevIndex != null && prevIndex >= 0) {
-      prevIndex = undefined;
-    }
-    nodesState[prevParentId] = {
-      ...prevParent,
-      childrenIds: prevParent.childrenIds?.filter((id) => id !== node.id),
-      updatedAt: Date.now(),
-    };
+    prevIndex = removeFromParent(nodesState, prevParentId, action.nodeId);
   }
 
   if (action.parentId == null) {
-    if (
-      action.index != null &&
-      action.index >= 0 &&
-      action.index < pinnedIdsState.length
-    ) {
-      pinnedIdsState.splice(action.index, 0, node.id);
-    } else {
-      pinnedIdsState.push(node.id);
-    }
+    addToPinned(pinnedIdsState, action.nodeId, action.index);
   } else {
-    const nextParent = nodesState[action.parentId];
-    if (!nextParent) {
-      console.error(`Cannot move to unknown parent node ${action.parentId}`);
-      return;
-    }
+    addToParent(nodesState, action.parentId, action.nodeId, action.index);
+  }
 
-    const nextParentChildrenIds = nextParent.childrenIds
-      ? [...nextParent.childrenIds]
-      : [];
-    if (
-      action.index != null &&
-      action.index >= 0 &&
-      action.index < nextParentChildrenIds.length
-    ) {
-      nextParentChildrenIds.splice(action.index, 0, node.id);
-    } else {
-      nextParentChildrenIds.push(node.id);
-    }
-    nodesState[action.parentId] = {
-      ...nodesState[action.parentId],
-      childrenIds: nextParentChildrenIds,
-      updatedAt: Date.now(),
-    };
+  nodesState[action.nodeId] = {
+    ...prev,
+    parentId: action.parentId,
+    updatedAt: Date.now(),
+  };
+
+  const undoAction = actions.move(action.nodeId, prevParentId, prevIndex);
+  const focusedState = get(focusedIdAtom);
+  if (focusedState !== focus) {
+    undoAction.focus = focusedState;
+    set(focusedIdAtom, focus);
   }
 
   set(nodesAtom, nodesState);
   set(pinnedIdsAtom, pinnedIdsState);
-
-  const undoAction = makeAction.move(action.nodeId, prevParentId, prevIndex);
   set(undoStackAtom, [...get(undoStackAtom), undoAction]);
 }
 
-function handleRemoveAction(
+export function handleRemove(
   get: Getter,
   set: Setter,
-  action: INodeRemoveAction,
+  { action, focus }: IDispatchEventGeneric<INodeRemoveAction>,
 ) {
-  const state = { ...get(nodesAtom) };
-  const prev = state[action.node.id];
+  const nodesState = { ...get(nodesAtom) };
+  const prev = nodesState[action.node.id];
 
   let prevParentId = prev.parentId;
-  let prevIndex = undefined;
-  if (prevParentId) {
-    const parent = state[prevParentId];
-    if (!parent) {
-      prevParentId = null;
-    } else {
-      prevIndex = parent.childrenIds?.indexOf(prev.id);
-      if (prevIndex === -1) {
-        console.error(
-          `Node ${prev.id} not found in parent ${prevParentId} while removing node`,
-          action,
-        );
-        prevIndex = undefined;
-      } else {
-        state[prevParentId] = {
-          ...parent,
-          childrenIds: parent.childrenIds?.filter((id) => id !== prev.id),
-          updatedAt: Date.now(),
-        };
-      }
-    }
+  let prevIndex: number | undefined = undefined;
+  if (prevParentId != null) {
+    prevIndex = removeFromParent(nodesState, prevParentId, action.node.id);
+  } else {
+    const pinnedIdsState = [...get(pinnedIdsAtom)];
+    prevIndex = removeFromPinned(pinnedIdsState, action.node.id);
+    set(pinnedIdsAtom, pinnedIdsState);
   }
 
-  if (prevParentId == null) {
-    const list = get(pinnedIdsAtom);
-    prevIndex = list.indexOf(prev.id);
-    if (prevIndex === -1) {
-      console.error(
-        `Node ${prev.id} not found in pinned list while removing node`,
-        action,
-      );
-      prevIndex = undefined;
-    } else {
-      const nextList = [...list];
-      nextList.splice(prevIndex, 1);
-      set(pinnedIdsAtom, nextList);
-    }
+  delete nodesState[action.node.id];
+
+  const undoAction = actions.create(prevParentId, prev, prevIndex);
+  const focusedState = get(focusedIdAtom);
+  if (focusedState !== focus) {
+    undoAction.focus = focusedState;
+    set(focusedIdAtom, focus);
   }
-
-  delete state[action.nodeId];
-  set(nodesAtom, state);
-
-  const undoAction = makeAction.create(prevParentId, prevIndex, prev);
+  set(nodesAtom, nodesState);
   set(undoStackAtom, [...get(undoStackAtom), undoAction]);
 }
 
-export function handleFocusAction(get: Getter, set: Setter, action: I) {
+export function handleFocus(get: Getter, set: Setter, event: IDispatchEvent) {
   const focusedState = get(focusedIdAtom);
-  set(focusedIdAtom, action.nodeId);
+  set(focusedIdAtom, event.focus);
+  set(undoStackAtom, [...get(undoStackAtom), actions.focus(focusedState)]);
 }

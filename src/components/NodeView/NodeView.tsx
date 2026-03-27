@@ -1,4 +1,5 @@
 import { NodeContent } from "../NodeContent/NodeContent";
+import { NodeTree } from "../NodeTree/NodeTree";
 import styles from "./NodeView.module.css";
 
 interface IProps {
@@ -23,7 +24,9 @@ export function NodeView({ rootId }: IProps) {
           placeholder="Project name..."
         />
       </div>
-      <div className={styles.content}>{/* <NodeTree rootId={rootId} /> */}</div>
+      <div className={styles.content}>
+        <NodeTree rootId={rootId} />
+      </div>
     </div>
   );
 }
